@@ -9,35 +9,16 @@ type Graph comparable a
   = Graph { nodes : Dict comparable (Node comparable a) }
 
 
+-- NOTE: type system doesn't help differentiate between incoming and outgoing edges
+
+
 type Node comparable data
   = Node
       { key : comparable
       , data : Maybe data
-      , incoming : IncomingKeys comparable
-      , outgoing : OutgoingKeys comparable
+      , incoming : Set comparable
+      , outgoing : Set comparable
       }
-
-
--- HELPER TYPES
--- to avoid mixing up incoming and outgoing keys
-
-
-type IncomingKeys comparable
-  = IncomingKeys (Set comparable)
-
-
-type OutgoingKeys comparable
-  = OutgoingKeys (Set comparable)
-
-
-incomingKeys : Set comparable -> IncomingKeys comparable
-incomingKeys set =
-  IncomingKeys set
-
-
-outgoingKeys : Set comparable -> OutgoingKeys comparable
-outgoingKeys set =
-  OutgoingKeys set
 
 
 -- HELPERS
@@ -48,8 +29,8 @@ nodeKey key =
   Node
     { key = key
     , data = Nothing
-    , incoming = incomingKeys <| Set.empty
-    , outgoing = outgoingKeys <| Set.empty
+    , incoming = Set.empty
+    , outgoing = Set.empty
     }
 
 
@@ -58,19 +39,12 @@ nodeKeyData key data =
   Node
     { key = key
     , data = Just data
-    , incoming = incomingKeys <| Set.empty
-    , outgoing = outgoingKeys <| Set.empty
+    , incoming = Set.empty
+    , outgoing = Set.empty
     }
 
 
 -- QUERY
-
-
-empty : Graph comparable data
-empty =
-  Graph
-    { nodes = Dict.empty
-    }
 
 
 get : comparable -> Graph comparable data -> Maybe (Node comparable data)
@@ -83,26 +57,31 @@ getOrNew key graph =
   Maybe.withDefault (nodeKey key) (get key graph)
 
 
-data : comparable -> Graph comparable data -> Maybe data
-data key graph =
-  get key graph |> Maybe.andThen (\(Node node) -> node.data)
+getData : Node comparable data -> Maybe data
+getData (Node node) =
+  node.data
 
 
--- TODO: remove graph argument to outgoing, incoming?
+incoming : Node comparable data -> Set comparable
+incoming (Node node) =
+  node.incoming
 
 
-incoming : Node comparable data -> Graph comparable data -> Set comparable
-incoming (Node node) graph =
-  case node.incoming of
-    IncomingKeys set ->
-      set
+outgoing : Node comparable data -> Set comparable
+outgoing (Node node) =
+  node.outgoing
 
 
-outgoing : Node comparable data -> Graph comparable data -> Set comparable
-outgoing (Node node) graph =
-  case node.outgoing of
-    OutgoingKeys set ->
-      set
+-- BUILD
+
+
+{-| Create an empty graph.
+-}
+empty : Graph comparable data
+empty =
+  Graph
+    { nodes = Dict.empty
+    }
 
 
 {-| Insert a node. Does not overwrite metadata if node already exists.
@@ -138,7 +117,7 @@ insertEdge from to (Graph graph) =
             Dict.insert from
               (Node
                 { fromNode
-                  | outgoing = outgoingKeys <| Set.insert from (outgoing (Node fromNode) (Graph graph))
+                  | outgoing = Set.insert from (outgoing (Node fromNode))
                 }
               )
             <|
@@ -149,9 +128,99 @@ insertEdge from to (Graph graph) =
                 Dict.insert to
                   (Node
                     { toNode
-                      | incoming = incomingKeys <| Set.insert to (incoming (Node toNode) (Graph graph))
+                      | incoming = Set.insert to (incoming (Node toNode))
                     }
                   )
                 <|
                   graph.nodes
     }
+
+
+-- REMOVE
+
+
+{-| Remove a node by its key. No-op if node doesn't exist.
+-}
+removeNode : comparable -> Graph comparable data -> Graph comparable data
+removeNode key (Graph graph) =
+  case get key (Graph graph) of
+    Nothing ->
+      (Graph graph)
+
+    Just node ->
+      let
+        edgesToRemove =
+          List.map (\in_ -> ( in_, key )) (Set.toList <| incoming node)
+            ++ List.map (\out -> ( key, out )) (Set.toList <| outgoing node)
+
+        newGraph =
+          Graph { graph | nodes = Dict.remove key graph.nodes }
+      in
+        List.foldl removeEdge newGraph edgesToRemove
+
+
+removeEdge : ( comparable, comparable ) -> Graph comparable data -> Graph comparable data
+removeEdge ( from, to ) graph =
+  let
+    updateIncoming =
+      \(Node node) ->
+        Node
+          { node
+            | incoming = Set.remove from (incoming (Node node))
+          }
+
+    updateOutgoing =
+      \(Node node) ->
+        Node
+          { node
+            | outgoing = Set.remove to (outgoing (Node node))
+          }
+  in
+    graph
+      |> changeNode updateIncoming to
+      |> changeNode updateOutgoing from
+
+
+-- UPDATE
+
+
+{-| Update a node if it exists, otherwise do nothing.
+-}
+changeNode : (Node comparable data -> Node comparable data) -> comparable -> Graph comparable data -> Graph comparable data
+changeNode func key graph =
+  -- TODO: terrible name
+  -- TODO: reconsider api; this might silence errors
+  -- make a new function that creates the node if it doesn't exist
+  updateNode (Maybe.map func) key graph
+
+
+{-| Update a node with a given key. If it doesn't exist, `func` gets `Nothing` as its argument. If `func` returns `Nothing`, the node is removed.
+-}
+updateNode : (Maybe (Node comparable data) -> Maybe (Node comparable data)) -> comparable -> Graph comparable data -> Graph comparable data
+updateNode func key (Graph graph) =
+  case func <| get key (Graph graph) of
+    Nothing ->
+      Graph { graph | nodes = Dict.remove key graph.nodes }
+
+    Just node ->
+      Graph { graph | nodes = Dict.insert key node graph.nodes }
+
+
+reversePostOrderKeys : List comparable -> Set comparable -> Graph comparable data -> List comparable
+reversePostOrderKeys nodeKeys seenKeys graph =
+  -- invariant: nodeKeys does not overlap at all with seenKeys
+  if List.isEmpty nodeKeys then
+    []
+  else
+    let
+      nodes =
+        List.concatMap (\key -> Maybe.Extra.toList <| get key graph) nodeKeys
+
+      nextSeenKeys =
+        List.foldl Set.insert seenKeys nodeKeys
+
+      next =
+        List.filter (\key -> not <| Set.member key nextSeenKeys || List.member key nodeKeys) <|
+          List.concatMap (\node -> Set.toList <| outgoing node) nodes
+    in
+      nodeKeys ++ reversePostOrderKeys next nextSeenKeys graph
