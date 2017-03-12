@@ -1,6 +1,7 @@
 module Graph exposing (..)
 
 import Dict exposing (Dict)
+import List.Extra
 import Maybe.Extra
 import Set exposing (Set)
 
@@ -44,32 +45,9 @@ nodeKeyData key data =
     }
 
 
--- QUERY
-
-
-get : comparable -> Graph comparable data -> Maybe (Node comparable data)
-get key (Graph graph) =
-  Dict.get key graph.nodes
-
-
-getOrNew : comparable -> Graph comparable data -> Node comparable data
-getOrNew key graph =
-  Maybe.withDefault (nodeKey key) (get key graph)
-
-
-getData : Node comparable data -> Maybe data
-getData (Node node) =
-  node.data
-
-
-incoming : Node comparable data -> Set comparable
-incoming (Node node) =
-  node.incoming
-
-
-outgoing : Node comparable data -> Set comparable
-outgoing (Node node) =
-  node.outgoing
+insert : Node comparable data -> Graph comparable data -> Graph comparable data
+insert node (Graph graph) =
+  Graph <| { graph | nodes = Dict.insert (nodeId node) node graph.nodes }
 
 
 -- BUILD
@@ -112,7 +90,7 @@ insertEdge from to (Graph graph) =
       | nodes =
           let
             (Node fromNode) =
-              getOrNew from (Graph graph)
+              getOrInsert from (Graph graph)
           in
             Dict.insert from
               (Node
@@ -123,7 +101,7 @@ insertEdge from to (Graph graph) =
             <|
               let
                 (Node toNode) =
-                  getOrNew to (Graph graph)
+                  getOrInsert to (Graph graph)
               in
                 Dict.insert to
                   (Node
@@ -134,9 +112,6 @@ insertEdge from to (Graph graph) =
                 <|
                   graph.nodes
     }
-
-
--- REMOVE
 
 
 {-| Remove a node by its key. No-op if node doesn't exist.
@@ -159,6 +134,8 @@ removeNode key (Graph graph) =
         List.foldl removeEdge newGraph edgesToRemove
 
 
+{-| Remove an edge its source and target keys. No-op if edge doesn't exist.
+-}
 removeEdge : ( comparable, comparable ) -> Graph comparable data -> Graph comparable data
 removeEdge ( from, to ) graph =
   let
@@ -177,8 +154,94 @@ removeEdge ( from, to ) graph =
           }
   in
     graph
-      |> changeNode updateIncoming to
-      |> changeNode updateOutgoing from
+      |> updateNodeIfExists updateIncoming to
+      |> updateNodeIfExists updateOutgoing from
+
+
+-- QUERY
+
+
+{-| Get the id (key) of a node.
+-}
+nodeId : Node comparable data -> comparable
+nodeId (Node node) =
+  node.key
+
+
+{-| Get the node with a specific key. Returns Nothing if it doesn't exist.
+-}
+get : comparable -> Graph comparable data -> Maybe (Node comparable data)
+get key (Graph graph) =
+  Dict.get key graph.nodes
+
+
+{-| Get or insert a node with a specific key.
+-}
+getOrInsert : comparable -> Graph comparable data -> Node comparable data
+getOrInsert key graph =
+  Maybe.withDefault (nodeKey key) (get key graph)
+
+
+{-| Get the data associated with a specific node.
+-}
+getData : Node comparable data -> Maybe data
+getData (Node node) =
+  node.data
+
+
+{-| Get the set of incoming edges to a node.
+-}
+incoming : Node comparable data -> Set comparable
+incoming (Node node) =
+  node.incoming
+
+
+{-| Get the set of outgoing edges from a node.
+-}
+outgoing : Node comparable data -> Set comparable
+outgoing (Node node) =
+  node.outgoing
+
+
+{-| Determine the number of nodes in the graph.
+-}
+size : Graph comparable data -> Int
+size (Graph graph) =
+  Dict.size graph.nodes
+
+
+{-| Get all nodes in the graph.
+-}
+nodes : Graph comparable data -> List (Node comparable data)
+nodes (Graph graph) =
+  Dict.values graph.nodes
+
+
+{-| Get all directional edges in the graph. O(V+E)
+-}
+edges : Graph comparable data -> List ( comparable, comparable )
+edges graph =
+  (nodes graph)
+    |> List.concatMap
+        (\node ->
+          let
+            outgoingEdges =
+              Set.toList <| outgoing node
+
+            outgoingSize =
+              Set.size <| outgoing node
+          in
+            List.Extra.zip
+              (List.repeat outgoingSize (nodeId node))
+              outgoingEdges
+        )
+
+
+{-| Check if a graph is empty, i.e. contains no nodes.
+-}
+isEmpty : Graph comparable data -> Bool
+isEmpty (Graph graph) =
+  Dict.isEmpty graph.nodes
 
 
 -- UPDATE
@@ -186,8 +249,8 @@ removeEdge ( from, to ) graph =
 
 {-| Update a node if it exists, otherwise do nothing.
 -}
-changeNode : (Node comparable data -> Node comparable data) -> comparable -> Graph comparable data -> Graph comparable data
-changeNode func key graph =
+updateNodeIfExists : (Node comparable data -> Node comparable data) -> comparable -> Graph comparable data -> Graph comparable data
+updateNodeIfExists func key graph =
   -- TODO: terrible name
   -- TODO: reconsider api; this might silence errors
   -- make a new function that creates the node if it doesn't exist
@@ -204,6 +267,33 @@ updateNode func key (Graph graph) =
 
     Just node ->
       Graph { graph | nodes = Dict.insert key node graph.nodes }
+
+
+{-| Fold over the nodes in a graph, in order from lowest key to highest key.
+-}
+foldl :
+  (Node comparable data -> Graph comparable data -> a -> a)
+  -> a
+  -> Graph comparable data
+  -> a
+foldl func acc graph =
+  -- TODO: pass graph as argument to func or not? It's always available anyway, but you almost always need it.
+  List.foldl (\node acc -> func node graph acc) acc <| nodes graph
+
+
+{-| Fold over the nodes in a graph, in order from highest key to lowest key.
+-}
+foldr :
+  (Node comparable data -> Graph comparable data -> a -> a)
+  -> a
+  -> Graph comparable data
+  -> a
+foldr func acc graph =
+  -- TODO: pass graph as argument to func or not? It's always available anyway, but you almost always need it.
+  List.foldr (\node acc -> func node graph acc) acc <| nodes graph
+
+
+-- OTHER
 
 
 reversePostOrderKeys : List comparable -> Set comparable -> Graph comparable data -> List comparable
