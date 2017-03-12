@@ -269,28 +269,205 @@ updateNode func key (Graph graph) =
       Graph { graph | nodes = Dict.insert key node graph.nodes }
 
 
+{-| Apply a function to all nodes in a graph.
+-}
+map : (Node comparable data -> Node comparable data) -> Graph comparable data -> Graph comparable data
+map func graph =
+  List.map func (nodes graph)
+    |> List.foldl insert empty
+
+
 {-| Fold over the nodes in a graph, in order from lowest key to highest key.
 -}
 foldl :
-  (Node comparable data -> Graph comparable data -> a -> a)
+  (Node comparable data -> a -> a)
   -> a
   -> Graph comparable data
   -> a
 foldl func acc graph =
-  -- TODO: pass graph as argument to func or not? It's always available anyway, but you almost always need it.
-  List.foldl (\node acc -> func node graph acc) acc <| nodes graph
+  List.foldl func acc <| nodes graph
 
 
 {-| Fold over the nodes in a graph, in order from highest key to lowest key.
 -}
 foldr :
-  (Node comparable data -> Graph comparable data -> a -> a)
+  (Node comparable data -> a -> a)
   -> a
   -> Graph comparable data
   -> a
 foldr func acc graph =
-  -- TODO: pass graph as argument to func or not? It's always available anyway, but you almost always need it.
-  List.foldr (\node acc -> func node graph acc) acc <| nodes graph
+  List.foldr func acc <| nodes graph
+
+
+{-| Apply a function to all nodes in a graph. If that function returns Nothing, the node is removed.
+-}
+modify :
+  (Node comparable data -> Maybe (Node comparable data))
+  -> Graph comparable data
+  -> Graph comparable data
+modify func graph =
+  List.foldl
+    (\node graph ->
+      case func node of
+        Nothing ->
+          removeNode (nodeId node) graph
+
+        Just node ->
+          insert node graph
+    )
+    graph
+    (nodes graph)
+    |> cleanup
+
+
+filter : (Node comparable data -> Bool) -> Graph comparable data -> Graph comparable data
+filter func graph =
+  modify
+    (\node ->
+      if func node then
+        Just node
+      else
+        Nothing
+    )
+    graph
+    |> cleanup
+
+
+partition : (Node comparable data -> Bool) -> Graph comparable data -> ( Graph comparable data, Graph comparable data )
+partition func graph =
+  let
+    ( left, right ) =
+      foldl
+        (\node ( left, right ) ->
+          if func node then
+            ( insert node left, right )
+          else
+            ( left, insert node right )
+        )
+        ( empty, empty )
+        graph
+  in
+    ( cleanup left, cleanup right )
+
+
+cleanup : Graph comparable data -> Graph comparable data
+cleanup graph =
+  let
+    -- remove edges pointing to non-existent nodes
+    removeDeadEdges =
+      \(Node node) ->
+        Just <|
+          Node
+            { node
+              | incoming = Set.filter (\key -> get key graph /= Nothing) (node.incoming)
+              , outgoing = Set.filter (\key -> get key graph /= Nothing) (node.outgoing)
+            }
+  in
+    modify removeDeadEdges graph
+
+
+-- COMBINE
+
+
+union : Graph comparable data -> Graph comparable data -> Graph comparable data
+union (Graph a) (Graph b) =
+  Graph
+    { nodes =
+        Dict.merge
+          (\key node dict -> Dict.insert key node dict)
+          (\key (Node n1) (Node n2) dict ->
+            Dict.insert key
+              (Node
+                { key = key
+                , data = Maybe.Extra.or n1.data n2.data
+                , incoming = Set.union n1.incoming n2.incoming
+                , outgoing = Set.union n1.outgoing n2.outgoing
+                }
+              )
+              dict
+          )
+          (\key node dict -> Dict.insert key node dict)
+          a.nodes
+          b.nodes
+          Dict.empty
+    }
+    |> cleanup
+
+
+intersect : Graph comparable data -> Graph comparable data -> Graph comparable data
+intersect (Graph a) (Graph b) =
+  Graph
+    { nodes =
+        Dict.merge
+          (\key node dict -> dict)
+          (\key (Node n1) (Node n2) dict ->
+            Dict.insert key
+              (Node
+                { key = key
+                , data =
+                    if n1.data == n2.data then
+                      n1.data
+                    else
+                      Nothing
+                , incoming = Set.intersect n1.incoming n2.incoming
+                , outgoing = Set.intersect n1.outgoing n2.outgoing
+                }
+              )
+              dict
+          )
+          (\key node dict -> dict)
+          a.nodes
+          b.nodes
+          Dict.empty
+    }
+    |> cleanup
+
+
+diff : Graph comparable data -> Graph comparable data -> Graph comparable data
+diff (Graph a) (Graph b) =
+  Graph
+    { nodes =
+        Dict.merge
+          (\key node dict -> Dict.insert key node dict)
+          (\key (Node n1) (Node n2) dict -> dict)
+          (\key node dict -> dict)
+          a.nodes
+          b.nodes
+          Dict.empty
+    }
+    |> cleanup
+
+
+{-| The most general way of combining two graphs. You provide three
+accumulators for when a given node appears:
+
+  1. Only in the left graph.
+  2. In both graphs.
+  3. Only in the right graph.
+
+You then traverse all the keys from lowest to highest, building up whatever
+you want.
+-}
+merge :
+  (comparable -> Node comparable data -> Dict comparable (Node comparable data) -> Dict comparable (Node comparable data))
+  -> (comparable -> Node comparable data -> Node comparable data -> Dict comparable (Node comparable data) -> Dict comparable (Node comparable data))
+  -> (comparable -> Node comparable data -> Dict comparable (Node comparable data) -> Dict comparable (Node comparable data))
+  -> Graph comparable data
+  -> Graph comparable data
+  -> Dict comparable (Node comparable data)
+  -> Graph comparable data
+merge leftStep bothStep rightStep (Graph leftGraph) (Graph rightGraph) initialResult =
+  Graph
+    { nodes =
+        Dict.merge
+          leftStep
+          bothStep
+          rightStep
+          leftGraph.nodes
+          rightGraph.nodes
+          initialResult
+    }
+    |> cleanup
 
 
 -- OTHER
