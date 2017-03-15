@@ -97,7 +97,7 @@ insertNode key (Graph graph) =
       Graph graph
 
 
-{-| Insert a node with some associated metadata. Overwrites metadata if node already exists.
+{-| Update metadata for a node. Creates the node if it does not already exist.
 -}
 insertNodeData : comparable -> data -> Graph comparable data -> Graph comparable data
 insertNodeData key data (Graph graph) =
@@ -108,36 +108,23 @@ insertNodeData key data (Graph graph) =
 -}
 insertEdge : comparable -> comparable -> Graph comparable data -> Graph comparable data
 insertEdge from to (Graph graph) =
-  Graph
-    { graph
-      | nodes =
-          let
-            (Node fromNode) =
-              getOrInsert from (Graph graph)
-          in
-            Dict.insert from
-              (Node
-                { fromNode
-                  | outgoing = Set.insert from fromNode.outgoing
-                }
-              )
-            <|
-              let
-                (Node toNode) =
-                  getOrInsert to (Graph graph)
-              in
-                Dict.insert to
-                  (Node
-                    { toNode
-                      | incoming = Set.insert to toNode.incoming
-                    }
-                  )
-                <|
-                  graph.nodes
-    }
+  let
+    (Node fromNode) =
+      getOrCreate from (Graph graph)
+
+    (Node toNode) =
+      getOrCreate to (Graph graph)
+  in
+    Graph
+      { graph
+        | nodes =
+            graph.nodes
+              |> Dict.insert to (Node { toNode | incoming = Set.insert to toNode.incoming })
+              |> Dict.insert from (Node { fromNode | outgoing = Set.insert from fromNode.outgoing })
+      }
 
 
-getOrInsert key graph =
+getOrCreate key graph =
   get key graph |> Maybe.withDefault (nodeKey key)
 
 
@@ -163,24 +150,16 @@ removeNode key (Graph graph) =
         List.foldl removeEdge newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
 
 
-{-| Remove an edge its source and target keys. No-op if edge doesn't exist.
+{-| Remove an edge identified by its source and target keys. No-op if source, target or edge doesn't exist.
 -}
 removeEdge : ( comparable, comparable ) -> Graph comparable data -> Graph comparable data
 removeEdge ( from, to ) graph =
   let
     updateIncoming =
-      \(Node node) ->
-        Node
-          { node
-            | incoming = Set.remove from node.incoming
-          }
+      \(Node node) -> Node { node | incoming = Set.remove from node.incoming }
 
     updateOutgoing =
-      \(Node node) ->
-        Node
-          { node
-            | outgoing = Set.remove to node.outgoing
-          }
+      \(Node node) -> Node { node | outgoing = Set.remove to node.outgoing }
   in
     graph
       |> updateNodeIfExists updateIncoming to
@@ -190,8 +169,6 @@ removeEdge ( from, to ) graph =
 -- QUERY
 
 
-{-| Get the node with a specific key. Returns Nothing if it doesn't exist.
--}
 get : comparable -> Graph comparable data -> Maybe (Node comparable data)
 get key (Graph graph) =
   Dict.get key graph.nodes
@@ -202,20 +179,6 @@ get key (Graph graph) =
 size : Graph comparable data -> Int
 size (Graph graph) =
   Dict.size graph.nodes
-
-
-nodes : Graph comparable data -> List (Node comparable data)
-nodes (Graph graph) =
-  Dict.values graph.nodes
-
-
-edges : Graph comparable data -> List ( comparable, comparable )
-edges (Graph graph) =
-  Dict.toList graph.nodes
-    |> List.concatMap
-        (\( key, Node node ) ->
-          Set.toList node.outgoing |> List.map (\out -> ( key, out ))
-        )
 
 
 {-| Check if a graph is empty, i.e. contains no nodes.
@@ -242,7 +205,7 @@ updateNodeIfExists func key graph =
 -}
 updateNode : (Maybe (Node comparable data) -> Maybe (Node comparable data)) -> comparable -> Graph comparable data -> Graph comparable data
 updateNode func key (Graph graph) =
-  case func <| get key (Graph graph) of
+  case get key (Graph graph) |> func of
     Nothing ->
       Graph { graph | nodes = Dict.remove key graph.nodes }
 
@@ -254,26 +217,14 @@ updateNode func key (Graph graph) =
 -}
 filterData : (comparable -> Maybe data -> Bool) -> Graph comparable data -> Graph comparable data
 filterData func (Graph graph) =
-  Graph
-    { graph
-      | nodes =
-          Dict.filter
-            (\key (Node node) -> func key node.data)
-            graph.nodes
-    }
+  Graph { graph | nodes = Dict.filter (\key (Node node) -> func key node.data) graph.nodes }
 
 
 {-| Apply a function to the data associated with each node in a graph.
 -}
 mapData : (comparable -> Maybe data -> Maybe data) -> Graph comparable data -> Graph comparable data
 mapData func (Graph graph) =
-  Graph
-    { graph
-      | nodes =
-          Dict.map
-            (\key (Node node) -> Node { node | data = func key node.data })
-            graph.nodes
-    }
+  Graph { graph | nodes = Dict.map (\key (Node node) -> Node { node | data = func key node.data }) graph.nodes }
 
 
 {-| Fold over the node keys and data in a graph, in order from lowest key to highest key.
@@ -398,38 +349,6 @@ diff (Graph a) (Graph b) =
           a.nodes
           b.nodes
           Dict.empty
-    }
-    |> cleanup
-
-
-{-| The most general way of combining two graphs. You provide three
-accumulators for when a given node appears:
-
-  1. Only in the left graph.
-  2. In both graphs.
-  3. Only in the right graph.
-
-You then traverse all the keys from lowest to highest, building up whatever
-you want.
--}
-merge :
-  (comparable -> Node comparable data -> Dict comparable (Node comparable data) -> Dict comparable (Node comparable data))
-  -> (comparable -> Node comparable data -> Node comparable data -> Dict comparable (Node comparable data) -> Dict comparable (Node comparable data))
-  -> (comparable -> Node comparable data -> Dict comparable (Node comparable data) -> Dict comparable (Node comparable data))
-  -> Graph comparable data
-  -> Graph comparable data
-  -> Dict comparable (Node comparable data)
-  -> Graph comparable data
-merge leftStep bothStep rightStep (Graph leftGraph) (Graph rightGraph) initialResult =
-  Graph
-    { nodes =
-        Dict.merge
-          leftStep
-          bothStep
-          rightStep
-          leftGraph.nodes
-          rightGraph.nodes
-          initialResult
     }
     |> cleanup
 
