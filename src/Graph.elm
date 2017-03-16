@@ -6,7 +6,8 @@ module Graph
     , incoming
     , outgoing
     , size
-    , isEmpty
+    , nodes
+    , edges
       -- build
     , empty
     , insertNode
@@ -15,10 +16,10 @@ module Graph
     , removeNode
     , removeEdge
       -- transformation
-    , filterData
-    , mapData
+    , map
     , foldl
     , foldr
+      -- set operations
     , partition
     , union
     , intersect
@@ -92,7 +93,7 @@ nodeData data =
 
 insert : comparable -> Node comparable data -> Graph comparable data -> Graph comparable data
 insert key node (Graph graph) =
-  Graph <| { graph | nodes = Dict.insert key node graph.nodes }
+  Graph { graph | nodes = Dict.insert key node graph.nodes }
 
 
 -- BUILD
@@ -102,9 +103,7 @@ insert key node (Graph graph) =
 -}
 empty : Graph comparable data
 empty =
-  Graph
-    { nodes = Dict.empty
-    }
+  Graph { nodes = Dict.empty }
 
 
 {-| Insert a node. Does not overwrite metadata if node already exists.
@@ -124,21 +123,17 @@ insertNodeData key data (Graph graph) =
 {-| Insert an edge between two nodes. If the nodes are not already in the graph, they will be inserted.
 -}
 insertEdge : comparable -> comparable -> Graph comparable data -> Graph comparable data
-insertEdge from to (Graph graph) =
+insertEdge from to graph =
   let
     (Node fromNode) =
-      getOrCreate from (Graph graph)
+      getOrCreate from graph
 
     (Node toNode) =
-      getOrCreate to (Graph graph)
+      getOrCreate to graph
   in
-    Graph
-      { graph
-        | nodes =
-            graph.nodes
-              |> Dict.insert to (Node { toNode | incoming = Set.insert to toNode.incoming })
-              |> Dict.insert from (Node { fromNode | outgoing = Set.insert from fromNode.outgoing })
-      }
+    graph
+      |> insert to (Node { toNode | incoming = Set.insert to toNode.incoming })
+      |> insert from (Node { fromNode | outgoing = Set.insert from fromNode.outgoing })
 
 
 getOrCreate key graph =
@@ -198,20 +193,35 @@ size (Graph graph) =
   Dict.size graph.nodes
 
 
-{-| Check if a graph is empty, i.e. contains no nodes.
+{-| Get the (key, data) pair for each node in the graph.
 -}
-isEmpty : Graph comparable data -> Bool
-isEmpty (Graph graph) =
-  Dict.isEmpty graph.nodes
+nodes : Graph comparable data -> List ( comparable, Maybe data )
+nodes =
+  foldl (\key data list -> ( key, data ) :: list) []
+
+
+{-| Get the (from, to) pair for each edge in the graph.
+-}
+edges : Graph comparable data -> List ( comparable, comparable )
+edges graph =
+  foldl
+    (\key data list ->
+      (outgoing key graph
+        |> Set.toList
+        |> List.map (\out -> ( key, out ))
+      )
+        ++ list
+    )
+    []
+    graph
 
 
 -- UPDATE
 
 
-{-| Update a node if it exists, otherwise do nothing.
--}
 updateNode : (Node comparable data -> Node comparable data) -> comparable -> Graph comparable data -> Graph comparable data
 updateNode func key (Graph graph) =
+  -- Update a node if it exists, otherwise do nothing.
   case get key (Graph graph) of
     Just node ->
       Graph { graph | nodes = Dict.insert key (func node) graph.nodes }
@@ -220,17 +230,10 @@ updateNode func key (Graph graph) =
       Graph graph
 
 
-{-| Keep only data that satisfy the predicate.
--}
-filterData : (comparable -> Maybe data -> Bool) -> Graph comparable data -> Graph comparable data
-filterData func (Graph graph) =
-  Graph { graph | nodes = Dict.filter (\key (Node node) -> func key node.data) graph.nodes }
-
-
 {-| Apply a function to the data associated with each node in a graph.
 -}
-mapData : (comparable -> Maybe data1 -> Maybe data2) -> Graph comparable data1 -> Graph comparable data2
-mapData func (Graph graph) =
+map : (comparable -> Maybe data1 -> Maybe data2) -> Graph comparable data1 -> Graph comparable data2
+map func (Graph graph) =
   Graph { graph | nodes = Dict.map (\key (Node node) -> Node { node | data = func key node.data }) graph.nodes }
 
 
