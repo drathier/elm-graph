@@ -3,6 +3,7 @@ module Graph
     ( Graph
       -- query
     , getData
+    , member
     , incoming
     , outgoing
     , size
@@ -30,6 +31,13 @@ import Dict exposing (Dict)
 import List.Extra
 import Maybe.Extra
 import Set exposing (Set)
+
+
+{-
+
+   It is theoretically possible to get O(1) path traversals without enforcing a DAG or violating immutability, but that would make all inserts and modifications at least O(n), because all nodes reference all other nodes (except if the graph is disjoint). If I figure out a way to do the conversion in in linear time, I can add that later.
+
+-}
 
 
 type Graph comparable a
@@ -132,8 +140,8 @@ insertEdge from to graph =
       getOrCreate to graph
   in
     graph
-      |> insert to (Node { toNode | incoming = Set.insert to toNode.incoming })
-      |> insert from (Node { fromNode | outgoing = Set.insert from fromNode.outgoing })
+      |> insert to (Node { toNode | incoming = Set.insert from toNode.incoming })
+      |> insert from (Node { fromNode | outgoing = Set.insert to fromNode.outgoing })
 
 
 getOrCreate key graph =
@@ -191,6 +199,13 @@ get key (Graph graph) =
 size : Graph comparable data -> Int
 size (Graph graph) =
   Dict.size graph.nodes
+
+
+{-| Determine if a node identified by a key is in the graph.
+-}
+member : comparable -> Graph comparable data -> Bool
+member key (Graph graph) =
+  Dict.member key graph.nodes
 
 
 {-| Get the (key, data) pair for each node in the graph.
