@@ -1,4 +1,29 @@
-module Graph exposing (..)
+module Graph
+  exposing
+    ( Graph
+      -- query
+    , getData
+    , incoming
+    , outgoing
+    , size
+    , isEmpty
+      -- build
+    , empty
+    , insertNode
+    , insertNodeData
+    , insertEdge
+    , removeNode
+    , removeEdge
+      -- transformation
+    , filterData
+    , mapData
+    , foldl
+    , foldr
+    , partition
+    , union
+    , intersect
+    , diff
+    )
 
 import Dict exposing (Dict)
 import List.Extra
@@ -17,8 +42,7 @@ type Graph comparable a
 
 type Node comparable data
   = Node
-      { key : comparable
-      , data : Maybe data
+      { data : Maybe data
       , incoming : Set comparable
       , outgoing : Set comparable
       }
@@ -48,29 +72,27 @@ outgoing key graph =
 -- NODE HELPERS
 
 
-nodeKey : comparable -> Node comparable data
-nodeKey key =
+node : Node comparable data
+node =
   Node
-    { key = key
-    , data = Nothing
+    { data = Nothing
     , incoming = Set.empty
     , outgoing = Set.empty
     }
 
 
-nodeKeyData : comparable -> data -> Node comparable data
-nodeKeyData key data =
+nodeData : data -> Node comparable data
+nodeData data =
   Node
-    { key = key
-    , data = Just data
+    { data = Just data
     , incoming = Set.empty
     , outgoing = Set.empty
     }
 
 
-insert : Node comparable data -> Graph comparable data -> Graph comparable data
-insert (Node node) (Graph graph) =
-  Graph <| { graph | nodes = Dict.insert node.key (Node node) graph.nodes }
+insert : comparable -> Node comparable data -> Graph comparable data -> Graph comparable data
+insert key node (Graph graph) =
+  Graph <| { graph | nodes = Dict.insert key node graph.nodes }
 
 
 -- BUILD
@@ -88,20 +110,15 @@ empty =
 {-| Insert a node. Does not overwrite metadata if node already exists.
 -}
 insertNode : comparable -> Graph comparable data -> Graph comparable data
-insertNode key (Graph graph) =
-  case get key (Graph graph) of
-    Nothing ->
-      Graph { graph | nodes = Dict.insert key (nodeKey key) graph.nodes }
-
-    Just _ ->
-      Graph graph
+insertNode key graph =
+  insert key (getOrCreate key graph) graph
 
 
 {-| Update metadata for a node. Creates the node if it does not already exist.
 -}
 insertNodeData : comparable -> data -> Graph comparable data -> Graph comparable data
 insertNodeData key data (Graph graph) =
-  Graph { graph | nodes = Dict.insert key (nodeKeyData key data) graph.nodes }
+  Graph { graph | nodes = Dict.insert key (nodeData data) graph.nodes }
 
 
 {-| Insert an edge between two nodes. If the nodes are not already in the graph, they will be inserted.
@@ -125,7 +142,7 @@ insertEdge from to (Graph graph) =
 
 
 getOrCreate key graph =
-  get key graph |> Maybe.withDefault (nodeKey key)
+  get key graph |> Maybe.withDefault node
 
 
 {-| Remove a node by its key. No-op if node doesn't exist.
@@ -162,8 +179,8 @@ removeEdge ( from, to ) graph =
       \(Node node) -> Node { node | outgoing = Set.remove to node.outgoing }
   in
     graph
-      |> updateNodeIfExists updateIncoming to
-      |> updateNodeIfExists updateOutgoing from
+      |> updateNode updateIncoming to
+      |> updateNode updateOutgoing from
 
 
 -- QUERY
@@ -193,24 +210,14 @@ isEmpty (Graph graph) =
 
 {-| Update a node if it exists, otherwise do nothing.
 -}
-updateNodeIfExists : (Node comparable data -> Node comparable data) -> comparable -> Graph comparable data -> Graph comparable data
-updateNodeIfExists func key graph =
-  -- TODO: terrible name
-  -- TODO: reconsider api; this might silence errors
-  -- make a new function that creates the node if it doesn't exist
-  updateNode (Maybe.map func) key graph
-
-
-{-| Update a node with a given key. If it doesn't exist, `func` gets `Nothing` as its argument. If `func` returns `Nothing`, the node is removed.
--}
-updateNode : (Maybe (Node comparable data) -> Maybe (Node comparable data)) -> comparable -> Graph comparable data -> Graph comparable data
+updateNode : (Node comparable data -> Node comparable data) -> comparable -> Graph comparable data -> Graph comparable data
 updateNode func key (Graph graph) =
-  case get key (Graph graph) |> func of
-    Nothing ->
-      Graph { graph | nodes = Dict.remove key graph.nodes }
-
+  case get key (Graph graph) of
     Just node ->
-      Graph { graph | nodes = Dict.insert key node graph.nodes }
+      Graph { graph | nodes = Dict.insert key (func node) graph.nodes }
+
+    Nothing ->
+      Graph graph
 
 
 {-| Keep only data that satisfy the predicate.
@@ -222,7 +229,7 @@ filterData func (Graph graph) =
 
 {-| Apply a function to the data associated with each node in a graph.
 -}
-mapData : (comparable -> Maybe data -> Maybe data) -> Graph comparable data -> Graph comparable data
+mapData : (comparable -> Maybe data1 -> Maybe data2) -> Graph comparable data1 -> Graph comparable data2
 mapData func (Graph graph) =
   Graph { graph | nodes = Dict.map (\key (Node node) -> Node { node | data = func key node.data }) graph.nodes }
 
@@ -249,6 +256,8 @@ foldr func acc (Graph graph) =
   Dict.foldr (\key (Node node) -> func key node.data) acc graph.nodes
 
 
+{-| Partition a graph into two parts, one where the predicate function returns True, and one where it is False.
+-}
 partition : (comparable -> Maybe data -> Bool) -> Graph comparable data -> ( Graph comparable data, Graph comparable data )
 partition func (Graph graph) =
   let
@@ -284,6 +293,8 @@ cleanup (Graph graph) =
 -- COMBINE
 
 
+{-| Join two graphs together. If an edge appears between two nodes in either of the graphs, it will be in the resulting graph. If a node identified by a specific key appears in both graphs, it will be in the resulting graph. If both graphs have metadata for the same key, the metadata in the left graph will be used.
+-}
 union : Graph comparable data -> Graph comparable data -> Graph comparable data
 union (Graph a) (Graph b) =
   Graph
@@ -293,8 +304,7 @@ union (Graph a) (Graph b) =
           (\key (Node n1) (Node n2) dict ->
             Dict.insert key
               (Node
-                { key = key
-                , data = Maybe.Extra.or n1.data n2.data
+                { data = Maybe.Extra.or n1.data n2.data
                 , incoming = Set.union n1.incoming n2.incoming
                 , outgoing = Set.union n1.outgoing n2.outgoing
                 }
@@ -309,6 +319,8 @@ union (Graph a) (Graph b) =
     |> cleanup
 
 
+{-| Create a graph based on the intersection of two graphs. If both graphs have the same node, edge or associated metadata, it will be in the resulting graph.
+-}
 intersect : Graph comparable data -> Graph comparable data -> Graph comparable data
 intersect (Graph a) (Graph b) =
   Graph
@@ -318,8 +330,7 @@ intersect (Graph a) (Graph b) =
           (\key (Node n1) (Node n2) dict ->
             Dict.insert key
               (Node
-                { key = key
-                , data =
+                { data =
                     if n1.data == n2.data then
                       n1.data
                     else
@@ -338,6 +349,8 @@ intersect (Graph a) (Graph b) =
     |> cleanup
 
 
+{-| Create a new graph based on the first graph, but without any nodes or edges that are also present in the second graph.
+-}
 diff : Graph comparable data -> Graph comparable data -> Graph comparable data
 diff (Graph a) (Graph b) =
   Graph
