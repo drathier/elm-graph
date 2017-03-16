@@ -47,6 +47,7 @@ type Graph comparable a
 -- NOTE: type system doesn't help differentiate between incoming and outgoing edges
 -- NODE
 -- NOTE: Don't expose anything related to Node
+-- TODO: walk over documentation, write tests for all claims
 
 
 type Node comparable data
@@ -130,8 +131,8 @@ insertNodeData key data (Graph graph) =
 
 {-| Insert an edge between two nodes. If the nodes are not already in the graph, they will be inserted.
 -}
-insertEdge : comparable -> comparable -> Graph comparable data -> Graph comparable data
-insertEdge from to graph =
+insertEdge : ( comparable, comparable ) -> Graph comparable data -> Graph comparable data
+insertEdge ( from, to ) graph =
   let
     (Node fromNode) =
       getOrCreate from graph
