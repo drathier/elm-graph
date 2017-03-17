@@ -415,4 +415,65 @@ all =
                   |> Expect.equal
                       (foldr (\key data acc -> key :: acc) [] graph)
         ]
+    , describe "partition"
+        [ fuzz2 int int "Partition doesn't leave invalid edges" <|
+            \a b ->
+              allDifferent [ a, b ] <|
+                let
+                  ( left, right ) =
+                    empty
+                      |> insertEdge ( a, b )
+                      |> partition (\key _ -> key == a)
+                in
+                  many
+                    [ left |> nodes |> List.map Tuple.first |> Expect.equal [ a ]
+                    , left |> incoming a |> Expect.equal Set.empty
+                    , left |> outgoing a |> Expect.equal Set.empty
+                    , left |> edges |> List.map Tuple.first |> Expect.equal []
+                    , right |> nodes |> List.map Tuple.first |> Expect.equal [ b ]
+                    , right |> incoming a |> Expect.equal Set.empty
+                    , right |> outgoing a |> Expect.equal Set.empty
+                    , right |> edges |> List.map Tuple.first |> Expect.equal []
+                    ]
+        , fuzz5 int int int int int "partition preserves all data on edges" <|
+            \a b c d e ->
+              allDifferent [ a, b, c, d, e ] <|
+                let
+                  leftGraph =
+                    empty
+                      |> insertNodeData a { x = a }
+                      |> insertNodeData b { x = b }
+                      |> insertNodeData c { x = c }
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( a, c )
+
+                  rightGraph =
+                    empty
+                      |> insertNodeData d { x = d }
+                      |> insertNodeData e { x = e }
+                      |> insertEdge ( d, e )
+
+                  graph =
+                    rightGraph
+                      |> insertNodeData a { x = a }
+                      |> insertNodeData b { x = b }
+                      |> insertNodeData c { x = c }
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( a, c )
+                      |> insertEdge ( c, d )
+
+                  ( left, right ) =
+                    graph
+                      |> partition (\key _ -> key == a || key == b || key == c)
+                in
+                  many
+                    [ left |> Expect.equal leftGraph
+                    , right |> Expect.equal rightGraph
+                    , left |> getData a |> Expect.equal (Just { x = a })
+                    , left |> getData b |> Expect.equal (Just { x = b })
+                    , left |> getData c |> Expect.equal (Just { x = c })
+                    , right |> getData d |> Expect.equal (Just { x = d })
+                    , right |> getData e |> Expect.equal (Just { x = e })
+                    ]
+        ]
     ]

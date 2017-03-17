@@ -289,18 +289,17 @@ foldr func acc (Graph graph) =
 partition : (comparable -> Maybe data -> Bool) -> Graph comparable data -> ( Graph comparable data, Graph comparable data )
 partition func (Graph graph) =
   let
-    ( left, right ) =
-      Dict.foldl
-        (\key (Node node) ( left, right ) ->
-          if func key node.data then
-            ( Dict.insert key (Node node) left, right )
-          else
-            ( left, Dict.insert key (Node node) right )
-        )
-        ( Dict.empty, Dict.empty )
-        graph.nodes
+    add key (Node node) ( left, right ) =
+      if func key node.data then
+        ( Dict.insert key (Node node) left, right )
+      else
+        ( left, Dict.insert key (Node node) right )
   in
-    ( cleanup <| Graph { graph | nodes = left }, cleanup <| Graph { graph | nodes = right } )
+    Dict.foldl add ( Dict.empty, Dict.empty ) graph.nodes
+      |> Tuple.mapFirst (\x -> Graph { nodes = x })
+      |> Tuple.mapSecond (\x -> Graph { nodes = x })
+      |> Tuple.mapFirst cleanup
+      |> Tuple.mapSecond cleanup
 
 
 cleanup : Graph comparable data -> Graph comparable data
