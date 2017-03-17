@@ -320,7 +320,7 @@ cleanup (Graph graph) =
 -- COMBINE
 
 
-{-| Join two graphs together. If an edge appears between two nodes in either of the graphs, it will be in the resulting graph. If a node identified by a specific key appears in both graphs, it will be in the resulting graph. If both graphs have metadata for the same key, the metadata in the left graph will be used.
+{-| Join two graphs together. If an edge appears between two nodes in either of the graphs, it will be in the resulting graph. If a node identified by a specific key appears in any of the graphs, it will be in the resulting graph. If both graphs have metadata for the same key, the metadata in the left graph will be used.
 -}
 union : Graph comparable data -> Graph comparable data -> Graph comparable data
 union (Graph a) (Graph b) =

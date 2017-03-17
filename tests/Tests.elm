@@ -500,4 +500,100 @@ all =
                     , right |> Expect.equal (empty)
                     ]
         ]
+    , describe "union"
+        [ fuzz5 int int int int int "union of non-conflicting graphs" <|
+            \a b c d e ->
+              allDifferent [ a, b, c, d, e ] <|
+                let
+                  leftGraph =
+                    empty
+                      |> insertNodeData a { x = a }
+                      |> insertNodeData b { x = b }
+                      |> insertNodeData c { x = c }
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( a, c )
+
+                  rightGraph =
+                    empty
+                      |> insertNodeData d { x = d }
+                      |> insertNodeData e { x = e }
+                      |> insertEdge ( d, e )
+
+                  graph =
+                    leftGraph
+                      |> insertNodeData d { x = d }
+                      |> insertNodeData e { x = e }
+                      |> insertEdge ( d, e )
+
+                  graphUnion =
+                    leftGraph |> union rightGraph
+                in
+                  graphUnion |> Expect.equal graph
+        , fuzz2 int int "union of conflicting graphs preserves node data" <|
+            \a b ->
+              allDifferent [ a, b ] <|
+                let
+                  leftGraph =
+                    empty
+                      |> insertNodeData a { x = a }
+
+                  rightGraph =
+                    empty
+                      |> insertNodeData b { x = b }
+
+                  graph =
+                    leftGraph
+                      |> insertNodeData a { x = a }
+                      |> insertNodeData b { x = b }
+                      |> insertEdge ( a, b )
+
+                  graphUnionLeft =
+                    leftGraph
+                      |> insertEdge ( a, b )
+                      |> union rightGraph
+
+                  graphUnionRight =
+                    rightGraph
+                      |> insertEdge ( a, b )
+                      |> union leftGraph
+
+                  graphUnionEdgeLast =
+                    leftGraph
+                      |> union rightGraph
+                      |> insertEdge ( a, b )
+
+                  nodesAnswer =
+                    List.sortBy (\( a, _ ) -> a)
+                      [ ( a, Just { x = a } )
+                      , ( b, Just { x = b } )
+                      ]
+                in
+                  many
+                    [ graphUnionLeft |> Expect.equal graph
+                    , graphUnionRight |> Expect.equal graph
+                    , graphUnionEdgeLast |> Expect.equal graph
+                    , graphUnionLeft
+                        |> nodes
+                        |> List.sortBy (\( a, _ ) -> a)
+                        |> Expect.equal nodesAnswer
+                    , graphUnionRight
+                        |> nodes
+                        |> List.sortBy (\( a, _ ) -> a)
+                        |> Expect.equal nodesAnswer
+                    , graphUnionEdgeLast
+                        |> nodes
+                        |> List.sortBy (\( a, _ ) -> a)
+                        |> Expect.equal nodesAnswer
+                    ]
+        , fuzz2 int int "union prefers metadata from left graph" <|
+            \a b ->
+              let
+                left =
+                  empty |> insertNodeData a a
+
+                right =
+                  empty |> insertNodeData a b
+              in
+                union left right |> getData a |> Expect.equal (Just a)
+        ]
     ]
