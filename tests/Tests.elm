@@ -603,4 +603,50 @@ all =
               in
                 union left right |> getData a |> Expect.equal (Just a)
         ]
+    , describe "intersect"
+        [ fuzz2 int int "intersect keeps only intersected nodes" <|
+            \a b ->
+              allDifferent [ a, b ] <|
+                let
+                  subgraph =
+                    empty |> insertNode a
+
+                  graph =
+                    subgraph
+                      |> insertNode b
+                in
+                  intersect graph subgraph |> Expect.equal subgraph
+        , fuzz3 int int int "intersect keeps only intersected edges" <|
+            \a b c ->
+              allDifferent [ a, b, c ] <|
+                let
+                  subgraph =
+                    empty |> insertEdge ( a, b )
+
+                  graph =
+                    subgraph
+                      |> insertNode c
+                      |> insertEdge ( b, c )
+                in
+                  intersect graph subgraph |> edges |> Expect.equal (edges subgraph)
+        , fuzz5 int int int int int "intersection of larger graphs" <|
+            \a b c d e ->
+              allDifferent [ a, b, c, d, e ] <|
+                let
+                  leftGraph =
+                    empty
+                      |> insertNodeData a { x = a }
+                      |> insertNodeData b { x = b }
+                      |> insertNodeData c { x = c }
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( a, c )
+
+                  graph =
+                    leftGraph
+                      |> insertNodeData d { x = d }
+                      |> insertNodeData e { x = e }
+                      |> insertEdge ( d, e )
+                in
+                  graph |> intersect leftGraph |> Expect.equal leftGraph
+        ]
     ]

@@ -25,7 +25,6 @@ module Graph
     , partition
     , union
     , intersect
-    , diff
     )
 
 import Dict exposing (Dict)
@@ -368,23 +367,6 @@ intersect (Graph a) (Graph b) =
               )
               dict
           )
-          (\key node dict -> dict)
-          a.nodes
-          b.nodes
-          Dict.empty
-    }
-    |> cleanup
-
-
-{-| Create a new graph based on the first graph, but without any nodes or edges that are also present in the second graph.
--}
-diff : Graph comparable data -> Graph comparable data -> Graph comparable data
-diff (Graph a) (Graph b) =
-  Graph
-    { nodes =
-        Dict.merge
-          (\key node dict -> Dict.insert key node dict)
-          (\key (Node n1) (Node n2) dict -> dict)
           (\key node dict -> dict)
           a.nodes
           b.nodes
