@@ -475,5 +475,29 @@ all =
                     , right |> getData d |> Expect.equal (Just { x = d })
                     , right |> getData e |> Expect.equal (Just { x = e })
                     ]
+        , fuzz5 int int int int int "partition by always returning true yields a graph equal to input" <|
+            \a b c d e ->
+              allDifferent [ a, b, c, d, e ] <|
+                let
+                  graph =
+                    empty
+                      |> insertNodeData a { x = a }
+                      |> insertNodeData b { x = b }
+                      |> insertNodeData c { x = c }
+                      |> insertNodeData d { x = d }
+                      |> insertNodeData e { x = e }
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( a, c )
+                      |> insertEdge ( c, d )
+                      |> insertEdge ( d, e )
+
+                  ( left, right ) =
+                    graph
+                      |> partition (\_ _ -> True)
+                in
+                  many
+                    [ left |> Expect.equal (graph)
+                    , right |> Expect.equal (empty)
+                    ]
         ]
     ]
