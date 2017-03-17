@@ -45,7 +45,6 @@ install:
   - cd ..
 
 script:
-  - elm-format --validate src tests
   - npm test
   - npm test
   - npm test
