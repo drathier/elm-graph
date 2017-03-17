@@ -101,10 +101,12 @@ all =
                 |> Expect.true "member should be present"
         , fuzz2 int int "Member check for non-existant members returns false" <|
             \memberKey nonMemberKey ->
-              empty
-                |> insertNode memberKey
-                |> member nonMemberKey
-                |> Expect.false "non-member should not be present"
+              allDifferent [ memberKey, nonMemberKey ] <|
+                (empty
+                  |> insertNode memberKey
+                  |> member nonMemberKey
+                  |> Expect.false "non-member should not be present"
+                )
         , fuzz int "Empty graph has no members" <|
             \key ->
               empty
@@ -205,24 +207,25 @@ all =
     , describe "removeEdge"
         [ fuzz2 int int "Remove an edge, possibly to itself" <|
             \a b ->
-              let
-                graph =
-                  empty
-                    |> insertNodeData a { x = 1 }
-                    |> insertNodeData b { x = 2 }
-                    |> insertEdge ( a, b )
+              allDifferent [ a, b ] <|
+                let
+                  graph =
+                    empty
+                      |> insertNodeData a { x = 1 }
+                      |> insertNodeData b { x = 2 }
+                      |> insertEdge ( a, b )
 
-                removed =
-                  graph
-                    |> removeEdge ( a, b )
-              in
-                many
-                  [ graph |> Expect.notEqual removed
-                  , removed |> getData a |> Expect.equal (Just { x = 1 })
-                  , removed |> getData b |> Expect.equal (Just { x = 2 })
-                  , removed |> memberEdge ( a, b ) |> Expect.false "shouldn't have an edge from a to b"
-                  , removed |> memberEdge ( b, a ) |> Expect.false "shouldn't have an edge from b to a"
-                  ]
+                  removed =
+                    graph
+                      |> removeEdge ( a, b )
+                in
+                  many
+                    [ graph |> Expect.notEqual removed
+                    , removed |> getData a |> Expect.equal (Just { x = 1 })
+                    , removed |> getData b |> Expect.equal (Just { x = 2 })
+                    , removed |> memberEdge ( a, b ) |> Expect.false "shouldn't have an edge from a to b"
+                    , removed |> memberEdge ( b, a ) |> Expect.false "shouldn't have an edge from b to a"
+                    ]
         , fuzz2 int int "Removing a node removes all edges to it" <|
             \a b ->
               empty
@@ -281,63 +284,67 @@ all =
     , describe "insertEdge"
         [ fuzz2 int int "Insert an edge between two existing nodes" <|
             \from to ->
-              let
-                graph =
-                  empty
-                    |> insertNodeData from { data = from }
-                    |> insertNodeData to { data = to }
-                    |> insertEdge ( from, to )
-              in
-                many
-                  [ Expect.notEqual graph empty
-                  , Set.singleton to |> Expect.equal (outgoing from graph)
-                  , Set.singleton from |> Expect.equal (incoming to graph)
-                  , Just { data = from } |> Expect.equal (getData from graph)
-                  , Just { data = to } |> Expect.equal (getData to graph)
-                  ]
+              allDifferent [ from, to ] <|
+                let
+                  graph =
+                    empty
+                      |> insertNodeData from { data = from }
+                      |> insertNodeData to { data = to }
+                      |> insertEdge ( from, to )
+                in
+                  many
+                    [ Expect.notEqual graph empty
+                    , Set.singleton to |> Expect.equal (outgoing from graph)
+                    , Set.singleton from |> Expect.equal (incoming to graph)
+                    , Just { data = from } |> Expect.equal (getData from graph)
+                    , Just { data = to } |> Expect.equal (getData to graph)
+                    ]
         , fuzz2 int int "Insert an edge with non-existant source node" <|
             \from to ->
-              let
-                graph =
-                  empty
-                    |> insertNodeData to { data = to }
-                    |> insertEdge ( from, to )
-              in
-                many
-                  [ Expect.notEqual graph empty
-                  , Set.singleton to |> Expect.equal (outgoing from graph)
-                  , Set.singleton from |> Expect.equal (incoming to graph)
-                  , Nothing |> Expect.equal (getData from graph)
-                  , Just { data = to } |> Expect.equal (getData to graph)
-                  ]
+              allDifferent [ from, to ] <|
+                let
+                  graph =
+                    empty
+                      |> insertNodeData to { data = to }
+                      |> insertEdge ( from, to )
+                in
+                  many
+                    [ Expect.notEqual graph empty
+                    , Set.singleton to |> Expect.equal (outgoing from graph)
+                    , Set.singleton from |> Expect.equal (incoming to graph)
+                    , Nothing |> Expect.equal (getData from graph)
+                    , Just { data = to } |> Expect.equal (getData to graph)
+                    ]
         , fuzz2 int int "Insert an edge with non-existant target node" <|
             \from to ->
-              let
-                graph =
-                  empty
-                    |> insertNodeData from { data = from }
-                    |> insertEdge ( from, to )
-              in
-                many
-                  [ Expect.notEqual graph empty
-                  , Set.singleton to |> Expect.equal (outgoing from graph)
-                  , Set.singleton from |> Expect.equal (incoming to graph)
-                  , Just { data = from } |> Expect.equal (getData from graph)
-                  , Nothing |> Expect.equal (getData to graph)
-                  ]
+              allDifferent [ from, to ] <|
+                let
+                  graph =
+                    empty
+                      |> insertNodeData from { data = from }
+                      |> insertEdge ( from, to )
+                in
+                  many
+                    [ Expect.notEqual graph empty
+                    , Set.singleton to |> Expect.equal (outgoing from graph)
+                    , Set.singleton from |> Expect.equal (incoming to graph)
+                    , Just { data = from } |> Expect.equal (getData from graph)
+                    , Nothing |> Expect.equal (getData to graph)
+                    ]
         , fuzz2 int int "Insert an edge between two non-existant nodes" <|
             \from to ->
-              let
-                graph =
-                  insertEdge ( from, to ) empty
-              in
-                many
-                  [ Expect.notEqual graph empty
-                  , Set.singleton to |> Expect.equal (outgoing from graph)
-                  , Set.singleton from |> Expect.equal (incoming to graph)
-                  , Nothing |> Expect.equal (getData from graph)
-                  , Nothing |> Expect.equal (getData to graph)
-                  ]
+              allDifferent [ from, to ] <|
+                let
+                  graph =
+                    insertEdge ( from, to ) empty
+                in
+                  many
+                    [ Expect.notEqual graph empty
+                    , Set.singleton to |> Expect.equal (outgoing from graph)
+                    , Set.singleton from |> Expect.equal (incoming to graph)
+                    , Nothing |> Expect.equal (getData from graph)
+                    , Nothing |> Expect.equal (getData to graph)
+                    ]
         ]
     , describe "map"
         [ fuzz5 int int int int int "Use map to modify all data fields" <|
