@@ -111,6 +111,47 @@ all =
                 |> member key
                 |> Expect.false "empty graph should not have any members"
         ]
+    , describe "memberEdge"
+        [ fuzz2 int int "Edge membership check for present edges returns true" <|
+            \a b ->
+              empty
+                |> insertEdge ( a, b )
+                |> memberEdge ( a, b )
+                |> Expect.true "edge should be present"
+        , fuzz3 int int int "Edge membership  check for non-present members returns false" <|
+            \a b nonMember ->
+              allDifferent [ a, b, nonMember ] <|
+                let
+                  graph =
+                    empty
+                      |> insertEdge ( a, b )
+                in
+                  many
+                    [ graph
+                        |> memberEdge ( a, b )
+                        |> Expect.true "Edge ( a -> b ) should be present"
+                    , graph
+                        |> memberEdge ( a, nonMember )
+                        |> Expect.false "Edge ( a -> nonMember ) shouldn't be present"
+                    , graph
+                        |> memberEdge ( b, a )
+                        |> Expect.false "Edge ( b -> a ) shouldn't be present"
+                    , graph
+                        |> memberEdge ( b, nonMember )
+                        |> Expect.false "Edge ( b -> nonMember ) shouldn't be present"
+                    , graph
+                        |> memberEdge ( nonMember, a )
+                        |> Expect.false "Edge ( nonMember -> a ) shouldn't be present"
+                    , graph
+                        |> memberEdge ( nonMember, b )
+                        |> Expect.false "Edge ( nonMember -> b ) shouldn't be present"
+                    ]
+        , fuzz int "Empty graph has no members" <|
+            \key ->
+              empty
+                |> member key
+                |> Expect.false "empty graph should not have any members"
+        ]
     , describe "incoming"
         [ fuzz5 int int int int int "Incoming should return incoming edges" <|
             \a b c d e ->
@@ -160,6 +201,44 @@ all =
                     , outgoing d graph |> Expect.equal (Set.fromList [ e ])
                     , outgoing e graph |> Expect.equal (Set.fromList [ a, b ])
                     ]
+        ]
+    , describe "removeEdge"
+        [ fuzz2 int int "Remove an edge, possibly to itself" <|
+            \a b ->
+              let
+                graph =
+                  empty
+                    |> insertNodeData a { x = 1 }
+                    |> insertNodeData b { x = 2 }
+                    |> insertEdge ( a, b )
+
+                removed =
+                  graph
+                    |> removeEdge ( a, b )
+              in
+                many
+                  [ graph |> Expect.notEqual removed
+                  , removed |> getData a |> Expect.equal (Just { x = 1 })
+                  , removed |> getData b |> Expect.equal (Just { x = 2 })
+                  , removed |> memberEdge ( a, b ) |> Expect.false "shouldn't have an edge from a to b"
+                  , removed |> memberEdge ( b, a ) |> Expect.false "shouldn't have an edge from b to a"
+                  ]
+        , fuzz2 int int "Removing a node removes all edges to it" <|
+            \a b ->
+              empty
+                |> insertEdge ( a, b )
+                |> removeNode b
+                |> outgoing a
+                |> Set.member b
+                |> Expect.false "edge to removed node shouldn't be present"
+        , fuzz2 int int "Removing a node removes all edges from it" <|
+            \a b ->
+              empty
+                |> insertEdge ( a, b )
+                |> removeNode a
+                |> incoming b
+                |> Set.member a
+                |> Expect.false "edge from removed node shouldn't be present"
         ]
     , describe "size"
         [ fuzz (list int) "Size equals the number of unique keys inserted " <|
@@ -259,5 +338,81 @@ all =
                   , Nothing |> Expect.equal (getData from graph)
                   , Nothing |> Expect.equal (getData to graph)
                   ]
+        ]
+    , describe "map"
+        [ fuzz5 int int int int int "Use map to modify all data fields" <|
+            \a b c d e ->
+              allDifferent [ a, b, c, d, e ] <|
+                let
+                  graph =
+                    empty
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( a, c )
+                      |> insertEdge ( b, d )
+                      |> insertEdge ( c, d )
+                      |> insertEdge ( d, e )
+                      |> insertEdge ( e, a )
+                      |> insertNodeData a a
+                      |> insertNodeData b b
+                      |> insertNodeData e e
+
+                  nodesBefore =
+                    nodes graph
+
+                  func =
+                    (\key maybeData -> maybeData |> Maybe.map (\a -> a + 1))
+                in
+                  graph
+                    |> map func
+                    |> nodes
+                    |> Expect.equal
+                        (List.map
+                          (\( a, b ) ->
+                            ( a, (Maybe.map (\x -> x + 1) b) )
+                          )
+                         <|
+                          nodes <|
+                            graph
+                        )
+        ]
+    , describe "foldl"
+        [ fuzz (list int) "use foldl to sum up data in all nodes" <|
+            \keys ->
+              let
+                graph =
+                  List.foldl (\key -> insertNodeData key key) empty keys
+              in
+                graph
+                  |> foldl (\key data acc -> (data |> Maybe.withDefault 0) + acc) 0
+                  |> Expect.equal
+                      (List.sum <|
+                        List.map (\( x, d ) -> d |> Maybe.withDefault 0) <|
+                          nodes <|
+                            graph
+                      )
+        , fuzz (list int) "use foldl to get all keys in order" <|
+            \keys ->
+              let
+                graph =
+                  List.foldl insertNode empty keys
+              in
+                graph
+                  |> foldl (\key data acc -> key :: acc) []
+                  |> Expect.equal
+                      (List.map (\( x, d ) -> x) <|
+                        nodes <|
+                          graph
+                      )
+        , fuzz (list int) "foldl and foldr return keys in opposite order" <|
+            \keys ->
+              let
+                graph =
+                  List.foldl insertNode empty keys
+              in
+                graph
+                  |> foldl (\key data acc -> key :: acc) []
+                  |> List.reverse
+                  |> Expect.equal
+                      (foldr (\key data acc -> key :: acc) [] graph)
         ]
     ]

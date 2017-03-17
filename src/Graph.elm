@@ -4,6 +4,7 @@ module Graph
       -- query
     , getData
     , member
+    , memberEdge
     , incoming
     , outgoing
     , size
@@ -207,6 +208,14 @@ size (Graph graph) =
 member : comparable -> Graph comparable data -> Bool
 member key (Graph graph) =
   Dict.member key graph.nodes
+
+
+{-| Determine if an edge identified by a pair of keys is in the graph.
+-}
+memberEdge : ( comparable, comparable ) -> Graph comparable data -> Bool
+memberEdge ( from, to ) graph =
+  outgoing from graph
+    |> Set.member to
 
 
 {-| Get the (key, data) pair for each node in the graph.
