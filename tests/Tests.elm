@@ -649,4 +649,40 @@ all =
                 in
                   graph |> intersect leftGraph |> Expect.equal leftGraph
         ]
+    , describe "reversePostOrder"
+        [ test "reversePostOrder yields keys in reverse post order for trees" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 2 )
+                    |> insertEdge ( 1, 3 )
+                    |> insertEdge ( 2, 4 )
+                    |> insertEdge ( 2, 5 )
+              in
+                reversePostOrder graph |> Expect.equal [ 1, 3, 2, 5, 4 ]
+        , test "reversePostOrder yields keys in reverse post order for DAG's" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 2 )
+                    |> insertEdge ( 1, 3 )
+                    |> insertEdge ( 2, 4 )
+                    |> insertEdge ( 3, 4 )
+              in
+                -- this is not the only valid ordering, but it's the one our implementation gives.
+                reversePostOrder graph |> Expect.equal [ 1, 3, 2, 4 ]
+        , test "reversePostOrder gives a somewhat valid reverse post order for cyclic graphs that at least contains all keys, and is only unpredictable on cycles with random keys" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 2 )
+                    |> insertEdge ( 2, 3 )
+                    |> insertEdge ( 3, 1 )
+                    |> insertEdge ( 3, 4 )
+              in
+                reversePostOrder graph |> Expect.equal [ 1, 2, 3, 4 ]
+        ]
     ]
