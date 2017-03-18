@@ -1,52 +1,35 @@
-module Tests exposing (..)
+module GraphFuzzer exposing (..)
 
 import List.Extra
-import Maybe.Extra
 import Random.Pcg exposing (..)
-import Test exposing (..)
-import Expect
 import Fuzz exposing (Fuzzer)
-import String
 import Graph as G exposing (Graph, empty)
-import Set
 import Shrink exposing (Shrinker)
-
-
--- Validating
-
-
-checkComesBefore : a -> a -> List a -> Bool
-checkComesBefore first second list =
-  case list of
-    [] ->
-      False
-
-    head :: tail ->
-      if head == first then
-        List.member second list
-      else
-        checkComesBefore first second tail
-
-
-checkConstraints : List ( a, a ) -> List a -> Bool
-checkConstraints constraintList ordering =
-  constraintList
-    |> List.all (\( a, b ) -> checkComesBefore a b ordering)
 
 
 -- Fuzzing
 
 
+dagFuzzerWithoutLoops : Fuzzer (Graph Int data)
+dagFuzzerWithoutLoops =
+  Fuzz.custom (graphGenerator (edgeGenerator (<))) (graphShrinker (<))
+
+
+dagFuzzerWithLoops : Fuzzer (Graph Int data)
+dagFuzzerWithLoops =
+  Fuzz.custom (graphGenerator (edgeGenerator (<=))) (graphShrinker (<=))
+
+
 graphFuzzer : Fuzzer (Graph Int data)
 graphFuzzer =
-  Fuzz.custom graphGenerator graphShrinker
+  Fuzz.custom (graphGenerator (edgeGenerator (\_ _ -> True))) (graphShrinker (\_ _ -> True))
 
 
 -- Shrinking
 
 
-graphShrinker : Shrinker (Graph Int data)
-graphShrinker =
+graphShrinker : (Int -> Int -> Bool) -> Shrinker (Graph Int data)
+graphShrinker edgePredicate =
   let
     toGraph =
       List.foldl G.insertEdge empty
@@ -56,15 +39,17 @@ graphShrinker =
   in
     -- NOTE: only handles edges; nothing else
     Shrink.convert toGraph fromGraph <|
-      Shrink.list (Shrink.tuple ( Shrink.int, Shrink.int ))
+      Shrink.list (Shrink.keepIf (uncurry edgePredicate) <| Shrink.tuple ( Shrink.int, Shrink.int ))
 
 
 -- Generating
 
 
-graphGenerator : Generator (Graph Int data)
-graphGenerator =
-  int 0 15
+graphGenerator :
+  (List Int -> Generator (List ( Int, Int )))
+  -> Generator (Graph Int data)
+graphGenerator edgeGenerator =
+  int 0 20
     |> andThen (\n -> constant (List.range 0 n))
     |> andThen
         (\keys ->
@@ -76,8 +61,8 @@ graphGenerator =
         )
 
 
-edgeGenerator : List comparable -> Generator (List ( comparable, comparable ))
-edgeGenerator keys =
+edgeGenerator : (Int -> Int -> Bool) -> List Int -> Generator (List ( Int, Int ))
+edgeGenerator edgePredicate keys =
   list (List.length keys ^ 2) bool
     |> map
         (\lst ->
@@ -85,6 +70,7 @@ edgeGenerator keys =
             |> List.Extra.zip lst
             |> List.filter Tuple.first
             |> List.map Tuple.second
+            |> List.filter (uncurry edgePredicate)
         )
 
 

@@ -8,6 +8,7 @@ import Fuzz exposing (list, int, tuple, string)
 import String
 import Graph exposing (..)
 import Set
+import GraphFuzzer exposing (dagFuzzerWithLoops, dagFuzzerWithoutLoops, graphFuzzer)
 
 
 many : List Expect.Expectation -> Expect.Expectation
@@ -39,6 +40,33 @@ allDifferent lst expectation =
 
     [] ->
       expectation
+
+
+-- TopSort
+
+
+checkComesBefore : a -> a -> List a -> Expect.Expectation
+checkComesBefore first second list =
+  if first == second then
+    Expect.pass
+  else
+    case list of
+      [] ->
+        Expect.fail ("expected to find " ++ toString first)
+
+      head :: tail ->
+        if head == first then
+          List.member second tail |> Expect.true ("expected " ++ toString first ++ " to come before " ++ toString second)
+        else
+          checkComesBefore first second tail
+
+
+checkPartialOrdering : List ( a, a ) -> List a -> Expect.Expectation
+checkPartialOrdering constraintList ordering =
+  (constraintList
+    |> List.map (\( a, b ) -> checkComesBefore a b ordering)
+    |> many
+  )
 
 
 all : Test
@@ -649,8 +677,19 @@ all =
                 in
                   graph |> intersect leftGraph |> Expect.equal leftGraph
         ]
-    , describe "reversePostOrder"
-        [ test "reversePostOrder yields keys in reverse post order for trees" <|
+    , describe "topoSort"
+        [ test "topoSort handles edgeless graphs" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertNode 1
+                    |> insertNode 2
+                    |> insertNode 3
+                    |> insertNode 4
+              in
+                topoSort graph |> Expect.equal [ 4, 3, 2, 1 ]
+        , test "topoSort yields keys in reverse post order for trees" <|
             \() ->
               let
                 graph =
@@ -660,8 +699,8 @@ all =
                     |> insertEdge ( 2, 4 )
                     |> insertEdge ( 2, 5 )
               in
-                reversePostOrder graph |> Expect.equal [ 1, 3, 2, 5, 4 ]
-        , test "reversePostOrder yields keys in reverse post order for DAG's" <|
+                topoSort graph |> Expect.equal [ 1, 3, 2, 5, 4 ]
+        , test "topoSort yields keys in reverse post order for DAG's" <|
             \() ->
               let
                 graph =
@@ -672,8 +711,8 @@ all =
                     |> insertEdge ( 3, 4 )
               in
                 -- this is not the only valid ordering, but it's the one our implementation gives.
-                reversePostOrder graph |> Expect.equal [ 1, 3, 2, 4 ]
-        , test "reversePostOrder gives a somewhat valid reverse post order for cyclic graphs that at least contains all keys, and is only unpredictable on cycles with random keys" <|
+                topoSort graph |> Expect.equal [ 1, 3, 2, 4 ]
+        , test "topoSort gives a somewhat valid reverse post order for cyclic graphs that at least contains all keys, and is only unpredictable on cycles with random keys" <|
             \() ->
               let
                 graph =
@@ -683,6 +722,11 @@ all =
                     |> insertEdge ( 3, 1 )
                     |> insertEdge ( 3, 4 )
               in
-                reversePostOrder graph |> Expect.equal [ 1, 2, 3, 4 ]
+                topoSort graph |> Expect.equal [ 1, 2, 3, 4 ]
+        ]
+    , describe "topSort"
+        [ fuzz dagFuzzerWithLoops "topSort doesn't violate any partial orderings" <|
+            \graph ->
+              graph |> topoSort |> checkPartialOrdering (edges graph)
         ]
     ]

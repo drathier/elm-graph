@@ -26,7 +26,7 @@ module Graph
     , union
     , intersect
       -- graph traversal
-    , reversePostOrder
+    , topoSort
     )
 
 import Dict exposing (Dict)
@@ -380,29 +380,29 @@ intersect (Graph a) (Graph b) =
 -- OTHER
 
 
-{-| Get a list of all keys in reverse post order.
+{-| Get a list of all keys in reverse post order. This is also a valid topological sorting, if the graph is acyclic.
 -}
-reversePostOrder : Graph comparable data -> List comparable
-reversePostOrder (Graph graph) =
-  Tuple.second <| reversePostOrderHelper (Dict.keys graph.nodes) [] Set.empty (Graph graph)
+topoSort : Graph comparable data -> List comparable
+topoSort (Graph graph) =
+  Tuple.second <| topoSortHelper (Dict.keys graph.nodes) [] Set.empty (Graph graph)
 
 
-reversePostOrderHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data -> ( Set comparable, List comparable )
-reversePostOrderHelper nodeKeys keyOrder seenKeys graph =
+topoSortHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data -> ( Set comparable, List comparable )
+topoSortHelper nodeKeys keyOrder seenKeys graph =
   case nodeKeys of
     [] ->
       ( seenKeys, keyOrder )
 
     key :: keys ->
       if Set.member key seenKeys then
-        reversePostOrderHelper keys keyOrder seenKeys graph
+        topoSortHelper keys keyOrder seenKeys graph
       else
         let
           ( seen, order ) =
-            reversePostOrderHelper
+            topoSortHelper
               (outgoing key graph |> Set.toList)
               keyOrder
               (Set.insert key seenKeys)
               graph
         in
-          reversePostOrderHelper keys (key :: order) seen graph
+          topoSortHelper keys (key :: order) seen graph
