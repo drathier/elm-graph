@@ -8,7 +8,7 @@ import Fuzz exposing (list, int, tuple, string)
 import String
 import Graph exposing (..)
 import Set
-import GraphFuzzer exposing (acyclicGraphFuzzerWithSelfEdges, acyclicGraphFuzzer, graphFuzzer)
+import GraphFuzzer exposing (acyclicGraphFuzzer, acyclicGraphFuzzerWithSelfEdges, graphFuzzer)
 
 
 many : List Expect.Expectation -> Expect.Expectation
@@ -830,4 +830,27 @@ all =
                graph |> topologicalSort |> checkPartialOrdering (edges graph)
          ]
       -}
+    , describe "isAcyclic"
+        [ test "isAcyclic returns True for simple DAG" <|
+            \() ->
+              empty
+                |> insertEdge ( 0, 1 )
+                |> isAcyclic
+                |> Expect.true "directed acyclic graph should be acyclic"
+        , fuzz acyclicGraphFuzzer "isAcyclic returns True for DAG's" <|
+            \graph ->
+              isAcyclic graph |> Expect.true "directed acyclic graph should be acyclic"
+        , fuzz acyclicGraphFuzzerWithSelfEdges "isAcyclic returns False for graphs with loops but no cycles" <|
+            \graph ->
+              if size graph == 0 then
+                Expect.pass
+              else
+                isAcyclic graph |> Expect.false "graph with loops is not acyclic"
+        , fuzz acyclicGraphFuzzerWithSelfEdges "isAcyclic returns False for graphs with cycles but no loops" <|
+            \graph ->
+              if size graph == 0 then
+                Expect.pass
+              else
+                isAcyclic graph |> Expect.false "graph with cycles is not acyclic"
+        ]
     ]
