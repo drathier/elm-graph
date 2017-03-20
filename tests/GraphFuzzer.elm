@@ -1,22 +1,24 @@
 module GraphFuzzer exposing (..)
 
+import Dict exposing (Dict)
 import List.Extra
 import Random.Pcg exposing (..)
 import Fuzz exposing (Fuzzer)
 import Graph as G exposing (Graph, empty)
+import Set
 import Shrink exposing (Shrinker)
 
 
 -- Fuzzing
 
 
-dagFuzzerWithoutLoops : Fuzzer (Graph Int data)
-dagFuzzerWithoutLoops =
+acyclicGraphFuzzer : Fuzzer (Graph Int data)
+acyclicGraphFuzzer =
   Fuzz.custom (graphGenerator (edgeGenerator (<))) (graphShrinker (<))
 
 
-dagFuzzerWithLoops : Fuzzer (Graph Int data)
-dagFuzzerWithLoops =
+acyclicGraphFuzzerWithSelfEdges : Fuzzer (Graph Int data)
+acyclicGraphFuzzerWithSelfEdges =
   Fuzz.custom (graphGenerator (edgeGenerator (<=))) (graphShrinker (<=))
 
 
@@ -50,7 +52,8 @@ graphGenerator :
   -> Generator (Graph Int data)
 graphGenerator edgeGenerator =
   int 0 20
-    |> andThen (\n -> constant (List.range 0 n))
+    |> andThen (\n -> list n (int minInt maxInt))
+    |> map List.Extra.unique
     |> andThen
         (\keys ->
           map
@@ -66,11 +69,20 @@ edgeGenerator edgePredicate keys =
   list (List.length keys ^ 2) bool
     |> map
         (\lst ->
-          (product keys)
-            |> List.Extra.zip lst
-            |> List.filter Tuple.first
-            |> List.map Tuple.second
-            |> List.filter (uncurry edgePredicate)
+          let
+            d =
+              List.Extra.indexedFoldl (\idx v dict -> Dict.insert v idx dict) Dict.empty keys
+          in
+            (product keys)
+              |> List.Extra.zip lst
+              |> List.filter Tuple.first
+              |> List.map Tuple.second
+              |> List.filter
+                  (\( a, b ) ->
+                    edgePredicate
+                      (Dict.get a d |> Maybe.withDefault 0)
+                      (Dict.get b d |> Maybe.withDefault 0)
+                  )
         )
 
 

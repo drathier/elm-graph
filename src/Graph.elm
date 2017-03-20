@@ -26,8 +26,35 @@ module Graph
     , union
     , intersect
       -- graph traversal
-    , topoSort
+    , topologicalSort
     )
+
+{-|
+
+A simple functional graph library. Keys used to identify nodes can be any `comparable` and nodes can have any kind of metadata associated with them.
+
+All operations that look at a single node are at most `O(log n)`.
+Operations that look at all elements in the graph are at most `O(n log n)`.
+
+# Graphs
+@docs Graph
+
+# Query
+@docs getData, member, memberEdge, incoming, outgoing, size, nodes, edges
+
+# Build
+@docs empty, insertNode, insertNodeData, insertEdge, removeNode, removeEdge
+
+# Transform
+@docs map, foldl, foldr
+
+# Combine
+@docs partition, union, intersect
+
+# Algorithms and Traversal
+@docs topologicalSort
+
+-}
 
 import Dict exposing (Dict)
 import List.Extra
@@ -42,14 +69,15 @@ import Set exposing (Set)
 -}
 
 
+{-| A directed graph. `(Graph Int String) is a graph that uses `Int`s for identifying its nodes, and lets you store a `String` on each node.
+-}
 type Graph comparable a
   = Graph { nodes : Dict comparable (Node comparable a) }
 
 
 -- NOTE: type system doesn't help differentiate between incoming and outgoing edges
 -- NODE
--- NOTE: Don't expose anything related to Node
--- TODO: walk over documentation, write tests for all claims
+-- TODO: are all exposed functions tested?
 
 
 type Node comparable data
@@ -131,7 +159,7 @@ insertNodeData key data (Graph graph) =
   Graph { graph | nodes = Dict.insert key (nodeData data) graph.nodes }
 
 
-{-| Insert an edge between two nodes. If the nodes are not already in the graph, they will be inserted.
+{-| Insert an edge between two nodes. Creates any nodes that do not already exist.
 -}
 insertEdge : ( comparable, comparable ) -> Graph comparable data -> Graph comparable data
 insertEdge ( from, to ) graph =
@@ -285,7 +313,7 @@ foldr func acc (Graph graph) =
   Dict.foldr (\key (Node node) -> func key node.data) acc graph.nodes
 
 
-{-| Partition a graph into two parts, one where the predicate function returns True, and one where it is False.
+{-| Partition a graph into two parts, one with the nodes where the predicate function returned True, and one where it returned False.
 -}
 partition : (comparable -> Maybe data -> Bool) -> Graph comparable data -> ( Graph comparable data, Graph comparable data )
 partition func (Graph graph) =
@@ -380,29 +408,35 @@ intersect (Graph a) (Graph b) =
 -- OTHER
 
 
-{-| Get a list of all keys in reverse post order. This is also a valid topological sorting, if the graph is acyclic.
+{-| Get a list of all keys in reverse postorder. This is also a valid topological sorting, if the graph is acyclic.
 -}
-topoSort : Graph comparable data -> List comparable
-topoSort (Graph graph) =
+topologicalSort : Graph comparable data -> List comparable
+topologicalSort (Graph graph) =
   Tuple.second <| topoSortHelper (Dict.keys graph.nodes) [] Set.empty (Graph graph)
 
 
 topoSortHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data -> ( Set comparable, List comparable )
 topoSortHelper nodeKeys keyOrder seenKeys graph =
-  case nodeKeys of
-    [] ->
-      ( seenKeys, keyOrder )
+  let
+    pad =
+      String.repeat (List.length keyOrder) "    "
+  in
+    case nodeKeys of
+      [] ->
+        Debug.log (pad ++ "  " ++ toString ( "done    ", "order", keyOrder, "seen", seenKeys )) <|
+          ( seenKeys, keyOrder )
 
-    key :: keys ->
-      if Set.member key seenKeys then
-        topoSortHelper keys keyOrder seenKeys graph
-      else
-        let
-          ( seen, order ) =
-            topoSortHelper
-              (outgoing key graph |> Set.toList)
-              keyOrder
-              (Set.insert key seenKeys)
-              graph
-        in
-          topoSortHelper keys (key :: order) seen graph
+      key :: keys ->
+        Debug.log (pad ++ "  " ++ toString ( "topoSort", key, "nodes", keys, "seen", seenKeys )) <|
+          if Set.member key seenKeys then
+            topoSortHelper keys keyOrder seenKeys graph
+          else
+            let
+              ( seen, order ) =
+                topoSortHelper
+                  (outgoing key graph |> Set.toList)
+                  keyOrder
+                  (Set.insert key seenKeys)
+                  graph
+            in
+              topoSortHelper keys (key :: order) seen graph
