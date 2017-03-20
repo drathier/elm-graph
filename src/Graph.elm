@@ -27,6 +27,7 @@ module Graph
     , intersect
       -- graph traversal
     , topologicalSort
+    , postOrder
     , isAcyclic
     )
 
@@ -172,9 +173,20 @@ insertEdge ( from, to ) graph =
     (Node toNode) =
       getOrCreate to graph
   in
-    graph
-      |> insert to (Node { toNode | incoming = Set.insert from toNode.incoming })
-      |> insert from (Node { fromNode | outgoing = Set.insert to fromNode.outgoing })
+    if from == to then
+      -- self-edge, fill both incoming and outgoing
+      graph
+        |> insert from
+            (Node
+              { fromNode
+                | incoming = Set.insert from fromNode.incoming
+                , outgoing = Set.insert from fromNode.outgoing
+              }
+            )
+    else
+      graph
+        |> insert to (Node { toNode | incoming = Set.insert from toNode.incoming })
+        |> insert from (Node { fromNode | outgoing = Set.insert to fromNode.outgoing })
 
 
 getOrCreate key graph =
@@ -412,48 +424,71 @@ intersect (Graph a) (Graph b) =
 
 isAcyclic : Graph comparable data -> Bool
 isAcyclic graph =
-  foldl (\key _ acc -> acc && not (Set.member key <| outgoing key graph)) True graph
-    && isAcyclicHelper (topologicalSort graph) Set.empty graph
+  isAcyclicHelper (List.reverse <| reversePostOrder graph) Set.empty graph
 
 
+isAcyclicHelper : List comparable -> Set comparable -> Graph comparable data -> Bool
 isAcyclicHelper topSortedNodes seen graph =
   case topSortedNodes of
     [] ->
       True
 
     key :: keys ->
-      if not <| Set.foldl (\x acc -> acc && Set.member x seen) True (incoming key graph) then
+      if Set.member key (incoming key graph) then
+        -- has an edge to itself
+        False
+      else if not <| Set.isEmpty <| Set.intersect seen (incoming key graph) then
+        -- found a backwards edge
         False
       else
         isAcyclicHelper
-          (Set.toList (incoming key graph) ++ keys)
+          keys
           (Set.insert key seen)
           graph
 
 
-{-| Get a list of all keys in reverse postorder. This is also a valid topological sorting, if the graph is acyclic.
+{-| Get a topological sorting of the graph, if the graph doesn't contain any loops or cycles.
 -}
-topologicalSort : Graph comparable data -> List comparable
-topologicalSort (Graph graph) =
-  Tuple.second <| topoSortHelper (Dict.keys graph.nodes) [] Set.empty (Graph graph)
+topologicalSort : Graph comparable data -> Maybe (List comparable)
+topologicalSort graph =
+  let
+    revpo =
+      reversePostOrder graph
+  in
+    if isAcyclicHelper (List.reverse <| revpo) Set.empty graph then
+      Just revpo
+    else
+      Nothing
 
 
-topoSortHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data -> ( Set comparable, List comparable )
-topoSortHelper nodeKeys keyOrder seenKeys graph =
+{-| Get a list of all keys in postorder.
+-}
+postOrder : Graph comparable data -> List comparable
+postOrder graph =
+  List.reverse <| reversePostOrder graph
+
+
+reversePostOrder : Graph comparable data -> List comparable
+reversePostOrder (Graph graph) =
+  Tuple.second <| reversePostOrderHelper (Dict.keys graph.nodes) [] Set.empty (Graph graph)
+
+
+reversePostOrderHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data -> ( Set comparable, List comparable )
+reversePostOrderHelper nodeKeys keyOrder seenKeys graph =
   case nodeKeys of
     [] ->
       ( seenKeys, keyOrder )
 
     key :: keys ->
       if Set.member key seenKeys then
-        topoSortHelper keys keyOrder seenKeys graph
+        reversePostOrderHelper keys keyOrder seenKeys graph
       else
         let
           ( seen, order ) =
-            topoSortHelper
+            reversePostOrderHelper
               (outgoing key graph |> Set.toList)
               keyOrder
               (Set.insert key seenKeys)
               graph
         in
-          topoSortHelper keys (key :: order) seen graph
+          reversePostOrderHelper keys (key :: order) seen graph

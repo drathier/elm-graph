@@ -138,7 +138,22 @@ all =
                 |> Expect.equal (Just { data = data })
         ]
     , describe "insertEdge"
-        [ fuzz2 int int "Insert an edge between two existing nodes" <|
+        [ fuzz int "Insert a loop" <|
+            \key ->
+              let
+                graph =
+                  empty
+                    |> insertNodeData key { data = key }
+                    |> insertEdge ( key, key )
+              in
+                many
+                  [ Expect.notEqual graph empty
+                  , Set.singleton key |> Expect.equal (outgoing key graph)
+                  , Set.singleton key |> Expect.equal (incoming key graph)
+                  , Just { data = key } |> Expect.equal (getData key graph)
+                  , Just { data = key } |> Expect.equal (getData key graph)
+                  ]
+        , fuzz2 int int "Insert an edge between two existing nodes" <|
             \from to ->
               allDifferent [ from, to ] <|
                 let
@@ -753,46 +768,42 @@ all =
                 in
                   graph |> intersect leftGraph |> Expect.equal leftGraph
         ]
-    , describe "topologicalSort"
-        [ {- test "topologicalSort handles edgeless graphs" <|
-                       \() ->
-                         let
-                           graph =
-                             empty
-                               |> insertNode 1
-                               |> insertNode 2
-                               |> insertNode 3
-                               |> insertNode 4
-                         in
-                           topologicalSort graph |> Expect.equal [ 4, 3, 2, 1 ]
-                     ,
-                  test "topologicalSort yields keys in reverse post order for trees" <|
-                    \() ->
-                      let
-                        graph =
-                          empty
-                            |> insertEdge ( 1, 2 )
-                            |> insertEdge ( 1, 3 )
-                            |> insertEdge ( 2, 4 )
-                            |> insertEdge ( 2, 5 )
-                      in
-                        topologicalSort graph |> Expect.equal [ 1, 3, 2, 5, 4 ]
-                   ,
-               test "topologicalSort yields keys in reverse post order for DAG's" <|
-                 \() ->
-                   let
-                     graph =
-                       empty
-                         |> insertEdge ( 1, 2 )
-                         |> insertEdge ( 1, 3 )
-                         |> insertEdge ( 2, 4 )
-                         |> insertEdge ( 3, 4 )
-                   in
-                     -- this is not the only valid ordering, but it's the one our implementation gives.
-                     topologicalSort graph |> Expect.equal [ 1, 3, 2, 4 ]
-             ,
-          -}
-          test "topologicalSort yields keys in reverse post order for large DAG's" <|
+    , describe "postOrder"
+        [ test "postOrder handles edgeless graphs" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertNode 1
+                    |> insertNode 2
+                    |> insertNode 3
+                    |> insertNode 4
+              in
+                postOrder graph |> Expect.equal [ 1, 2, 3, 4 ]
+        , test "postOrder yields keys in post order for trees" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 2 )
+                    |> insertEdge ( 1, 3 )
+                    |> insertEdge ( 2, 4 )
+                    |> insertEdge ( 2, 5 )
+              in
+                postOrder graph |> Expect.equal [ 4, 5, 2, 3, 1 ]
+        , test "postOrder yields keys in post order for DAG's" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 2 )
+                    |> insertEdge ( 1, 3 )
+                    |> insertEdge ( 2, 4 )
+                    |> insertEdge ( 3, 4 )
+              in
+                -- this is not the only valid ordering, but it's the one our implementation gives.
+                postOrder graph |> Expect.equal [ 4, 2, 3, 1 ]
+        , test "postOrder yields keys in post order for large DAG's" <|
             \() ->
               let
                 graph =
@@ -810,47 +821,98 @@ all =
                     |> insertEdge ( 9, 10 )
               in
                 -- this is not the only valid ordering, but it's the one our implementation gives.
-                topologicalSort graph |> Expect.equal [ 7, 6, 8, 1, 4, 2, 3, 5, 9, 10 ]
-          {- , test "topologicalSort gives a somewhat valid reverse post order for cyclic graphs that at least contains all keys, and is only unpredictable on cycles with random keys" <|
-             \() ->
-               let
-                 graph =
-                   empty
-                     |> insertEdge ( 1, 2 )
-                     |> insertEdge ( 2, 3 )
-                     |> insertEdge ( 3, 1 )
-                     |> insertEdge ( 3, 4 )
-               in
-                 topologicalSort graph |> Expect.equal [ 1, 2, 3, 4 ]
-          -}
+                postOrder graph |> Expect.equal [ 10, 9, 5, 3, 2, 4, 1, 8, 6, 7 ]
+        , test "postOrder gives a valid post order for cyclic graphs" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 2 )
+                    |> insertEdge ( 2, 3 )
+                    |> insertEdge ( 3, 1 )
+                    |> insertEdge ( 3, 4 )
+              in
+                -- this is far from the only possible answer, but 4 always comes before 3
+                postOrder graph |> Expect.equal [ 4, 3, 2, 1 ]
         ]
-      {- , describe "topSort"
-         [ fuzz acyclicGraphFuzzer "topSort doesn't violate any partial orderings" <|
-             \graph ->
-               graph |> topologicalSort |> checkPartialOrdering (edges graph)
-         ]
-      -}
+    , describe "topSort"
+        [ fuzz acyclicGraphFuzzer "topSort doesn't violate any partial orderings" <|
+            \graph ->
+              case graph |> topologicalSort of
+                Nothing ->
+                  Expect.fail "Failed to generate a valid topological sort; is input acyclic?"
+
+                Just order ->
+                  order |> (checkPartialOrdering (edges graph))
+        , test "topSort doesn't return an ordering if there are cycles" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 2 )
+                    |> insertEdge ( 2, 3 )
+                    |> insertEdge ( 3, 1 )
+              in
+                case graph |> topologicalSort of
+                  Nothing ->
+                    Expect.pass
+
+                  Just order ->
+                    Expect.fail ("Got an ordering despite input being cyclical" ++ toString order)
+        , test "topSort doesn't return an ordering if there are loops" <|
+            \() ->
+              let
+                graph =
+                  empty
+                    |> insertEdge ( 1, 1 )
+              in
+                case graph |> topologicalSort of
+                  Nothing ->
+                    Expect.pass
+
+                  Just order ->
+                    Expect.fail ("Got an ordering despite input having loops" ++ toString order)
+        ]
     , describe "isAcyclic"
-        [ test "isAcyclic returns True for simple DAG" <|
+        [ test "isAcyclic returns True for single edge" <|
             \() ->
               empty
                 |> insertEdge ( 0, 1 )
                 |> isAcyclic
                 |> Expect.true "directed acyclic graph should be acyclic"
+        , test "isAcyclic returns True for simple tree" <|
+            \() ->
+              empty
+                |> insertEdge ( 0, 1 )
+                |> insertEdge ( 0, 2 )
+                |> isAcyclic
+                |> Expect.true "directed acyclic graph should be acyclic"
         , fuzz acyclicGraphFuzzer "isAcyclic returns True for DAG's" <|
             \graph ->
-              isAcyclic graph |> Expect.true "directed acyclic graph should be acyclic"
+              (isAcyclic graph |> Expect.true "directed acyclic graph should be acyclic")
         , fuzz acyclicGraphFuzzerWithSelfEdges "isAcyclic returns False for graphs with loops but no cycles" <|
             \graph ->
               if size graph == 0 then
                 Expect.pass
               else
-                isAcyclic graph |> Expect.false "graph with loops is not acyclic"
+                -- make sure there is at least one loop in the graph
+                graph
+                  |> insertEdge ( -1, -1 )
+                  |> isAcyclic
+                  |> Expect.false "graph with loops is not acyclic"
         , fuzz acyclicGraphFuzzerWithSelfEdges "isAcyclic returns False for graphs with cycles but no loops" <|
             \graph ->
               if size graph == 0 then
                 Expect.pass
               else
-                isAcyclic graph |> Expect.false "graph with cycles is not acyclic"
+                -- make sure we have a cycle in the graph by adding negative edges
+                graph
+                  |> insertEdge ( -1, -2 )
+                  |> insertEdge ( -2, -1 )
+                  |> isAcyclic
+                  |> Expect.false "graph with cycles is not acyclic"
         ]
     ]
+
+
+-- TODO: bug: managed to generate an invalid graph, self-edge with only outgoing set, incoming is empty
