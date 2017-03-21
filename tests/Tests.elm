@@ -905,14 +905,17 @@ all =
               if size graph == 0 then
                 Expect.pass
               else
-                -- make sure we have a cycle in the graph by adding negative edges
                 graph
-                  |> insertEdge ( -1, -2 )
+                  -- remove loops
+                  |>
+                    edges
+                  |> List.filter (uncurry (==))
+                  |> List.foldl removeEdge graph
+                  -- make sure we have a cycle in the graph by adding negative edges
+                  |>
+                    insertEdge ( -1, -2 )
                   |> insertEdge ( -2, -1 )
                   |> isAcyclic
                   |> Expect.false "graph with cycles is not acyclic"
         ]
     ]
-
-
--- TODO: bug: managed to generate an invalid graph, self-edge with only outgoing set, incoming is empty

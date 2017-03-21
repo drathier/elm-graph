@@ -42,7 +42,7 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs Graph
 
 # Query
-@docs getData, member, memberEdge, incoming, outgoing, size, nodes, edges
+@docs getData, member, memberEdge, incoming, outgoing, size, nodes, edges, isAcyclic
 
 # Build
 @docs empty, insertNode, insertNodeData, insertEdge, removeNode, removeEdge
@@ -54,7 +54,7 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs partition, union, intersect
 
 # Algorithms and Traversal
-@docs topologicalSort
+@docs postOrder, topologicalSort
 
 -}
 
@@ -78,9 +78,8 @@ type Graph comparable a
   = Graph { nodes : Dict comparable (Node comparable a) }
 
 
--- NOTE: type system doesn't help differentiate between incoming and outgoing edges
 -- NODE
--- TODO: are all exposed functions tested?
+-- NOTE: type system doesn't help differentiate between incoming and outgoing edges
 
 
 type Node comparable data
@@ -284,6 +283,33 @@ edges graph =
     graph
 
 
+{-| Determine if a graph contains any loops or cycles.
+-}
+isAcyclic : Graph comparable data -> Bool
+isAcyclic graph =
+  isAcyclicHelper (List.reverse <| reversePostOrder graph) Set.empty graph
+
+
+isAcyclicHelper : List comparable -> Set comparable -> Graph comparable data -> Bool
+isAcyclicHelper topSortedNodes seen graph =
+  case topSortedNodes of
+    [] ->
+      True
+
+    key :: keys ->
+      if Set.member key (incoming key graph) then
+        -- has an edge to itself
+        False
+      else if not <| Set.isEmpty <| Set.intersect seen (incoming key graph) then
+        -- found a backwards edge
+        False
+      else
+        isAcyclicHelper
+          keys
+          (Set.insert key seen)
+          graph
+
+
 -- UPDATE
 
 
@@ -419,32 +445,7 @@ intersect (Graph a) (Graph b) =
     |> cleanup
 
 
--- OTHER
-
-
-isAcyclic : Graph comparable data -> Bool
-isAcyclic graph =
-  isAcyclicHelper (List.reverse <| reversePostOrder graph) Set.empty graph
-
-
-isAcyclicHelper : List comparable -> Set comparable -> Graph comparable data -> Bool
-isAcyclicHelper topSortedNodes seen graph =
-  case topSortedNodes of
-    [] ->
-      True
-
-    key :: keys ->
-      if Set.member key (incoming key graph) then
-        -- has an edge to itself
-        False
-      else if not <| Set.isEmpty <| Set.intersect seen (incoming key graph) then
-        -- found a backwards edge
-        False
-      else
-        isAcyclicHelper
-          keys
-          (Set.insert key seen)
-          graph
+-- TRAVERSAL
 
 
 {-| Get a topological sorting of the graph, if the graph doesn't contain any loops or cycles.
