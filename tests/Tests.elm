@@ -153,7 +153,7 @@ all =
                   , Just { data = key } |> Expect.equal (getData key graph)
                   , Just { data = key } |> Expect.equal (getData key graph)
                   ]
-        , fuzz2 int int "Insert an edge between two existing nodes" <|
+        , fuzz2 int int "Insert an edge between two existing nodes preserves metadata" <|
             \from to ->
               allDifferent [ from, to ] <|
                 let

@@ -10,6 +10,7 @@ module Graph
     , size
     , nodes
     , edges
+    , isAcyclic
       -- build
     , empty
     , insertNode
@@ -28,7 +29,6 @@ module Graph
       -- graph traversal
     , topologicalSort
     , postOrder
-    , isAcyclic
     )
 
 {-|
@@ -36,7 +36,8 @@ module Graph
 A simple functional graph library. Keys used to identify nodes can be any `comparable` and nodes can have any kind of metadata associated with them.
 
 All operations that look at a single node are at most `O(log n)`.
-Operations that look at all elements in the graph are at most `O(n log n)`.
+
+Operations that look at all elements in the graph are at most `O(n log n + e)`.
 
 # Graphs
 @docs Graph
@@ -69,10 +70,100 @@ import Tuple
 
    It is theoretically possible to get O(1) path traversals without enforcing a DAG or violating immutability, but that would make all inserts and modifications at least O(n), because all nodes reference all other nodes (except if the graph is disjoint). If I figure out a way to do the conversion in in linear time, I can add that later.
 
+    TODO: edge metadata, for A*
+    shortestPath :
+      cost per edge ((comparable, comparable) -> Number)
+      cost per node (comparable -> Number)
+      estimated cost ((comparable, comparable) -> Number)
+      source
+      target
+      graph
+      -> Maybe (Number, List Node)
+
+    Cost functions have nice combos with `always 0`.
+
+    graph |> shortestPath {
+
+    }
+
 -}
 
 
-{-| A directed graph. `(Graph Int String) is a graph that uses `Int`s for identifying its nodes, and lets you store a `String` on each node.
+a graph shortestPath =
+  graph
+    |> shortestPath
+        { edgeCost = always 0
+        , nodeCost = always 0
+        , estimatedCost = always 0
+        , source = 0
+        , target = 0
+        }
+
+
+a2 graph shortestPath source target =
+  let
+    edgeCostFn ( from, to ) =
+      (graph |> getData from |> Maybe.map .weight |> Maybe.withDefault 0)
+        + (graph |> getData to |> Maybe.map .weight |> Maybe.withDefault 0)
+
+    nodeCostFn key =
+      graph |> getData key |> Maybe.map .weight |> Maybe.withDefault 0
+
+    estimatedCostFn key =
+      let
+        data =
+          (graph |> getData key |> Maybe.map .coordinates |> Maybe.withDefault 0)
+      in
+        (target.coordinates.x - data.x) ^ 2 + (target.coordinates.y - data.y) ^ 2
+  in
+    graph
+      |> shortestPath
+          { edgeCost = edgeCostFn
+          , nodeCost = nodeCostFn
+          , estimatedCost = estimatedCostFn
+          , source = 0
+          , target = 0
+          }
+
+
+b graph shortestPath =
+  graph
+    |> shortestPath
+        { edgeCost = (always 0)
+        , nodeCost = (\_ _ -> 0)
+        , estimatedCost = (\_ _ -> 0)
+        , source = 0
+        , target = 0
+        }
+
+
+b2 graph shortestPath source target =
+  let
+    edgeCostFn ( from, to ) =
+      (graph |> getData from |> Maybe.map .weight |> Maybe.withDefault 0)
+        + (graph |> getData to |> Maybe.map .weight |> Maybe.withDefault 0)
+
+    nodeCostFn key data =
+      data |> Maybe.map .weight |> Maybe.withDefault 0
+
+    estimatedCostFn key maybeData =
+      let
+        data =
+          (maybeData |> Maybe.map .coordinates |> Maybe.withDefault 0)
+      in
+        (target.coordinates.x - data.x) ^ 2 + (target.coordinates.y - data.y) ^ 2
+  in
+    graph
+      |> shortestPath
+          { edgeCost = edgeCostFn
+          , nodeCost = nodeCostFn
+          , estimatedCost = estimatedCostFn
+          , source = 0
+          , target = 0
+          }
+
+
+{-| A directed graph. `(Graph Int String)` is a graph that uses `Int`s for identifying its nodes, and lets you store a `String` on each node.
 -}
 type Graph comparable a
   = Graph { nodes : Dict comparable (Node comparable a) }
@@ -90,7 +181,7 @@ type Node comparable data
       }
 
 
-{-| Get the data associated with a specific node.
+{-| Get the metadata associated with a specific node.
 -}
 getData : comparable -> Graph comparable data -> Maybe data
 getData key graph =
@@ -161,7 +252,7 @@ insertNodeData key data (Graph graph) =
   Graph { graph | nodes = Dict.insert key (nodeData data) graph.nodes }
 
 
-{-| Insert an edge between two nodes. Creates any nodes that do not already exist.
+{-| Insert a directed edge between two nodes. Creates any nodes that do not already exist. Does not overwrite metadata if nodes exist.
 -}
 insertEdge : ( comparable, comparable ) -> Graph comparable data -> Graph comparable data
 insertEdge ( from, to ) graph =
@@ -214,7 +305,7 @@ removeNode key (Graph graph) =
         List.foldl removeEdge newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
 
 
-{-| Remove an edge identified by its source and target keys. No-op if source, target or edge doesn't exist.
+{-| Remove a directed edge identified by its source and target keys. No-op if source, target or edge doesn't exist.
 -}
 removeEdge : ( comparable, comparable ) -> Graph comparable data -> Graph comparable data
 removeEdge ( from, to ) graph =
@@ -252,7 +343,7 @@ member key (Graph graph) =
   Dict.member key graph.nodes
 
 
-{-| Determine if an edge identified by a pair of keys is in the graph.
+{-| Determine if a directed edge identified by a pair of keys is in the graph.
 -}
 memberEdge : ( comparable, comparable ) -> Graph comparable data -> Bool
 memberEdge ( from, to ) graph =
@@ -353,7 +444,7 @@ foldr func acc (Graph graph) =
   Dict.foldr (\key (Node node) -> func key node.data) acc graph.nodes
 
 
-{-| Partition a graph into two parts, one with the nodes where the predicate function returned True, and one where it returned False.
+{-| Partition a graph into two parts, one with the nodes where the predicate function returned True, and one where it returned False. Any edges between the two partitions are destroyed.
 -}
 partition : (comparable -> Maybe data -> Bool) -> Graph comparable data -> ( Graph comparable data, Graph comparable data )
 partition func (Graph graph) =
