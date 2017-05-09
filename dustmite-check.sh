@@ -1,9 +1,14 @@
 #!/bin/bash
 
+set -e
+# transform source, fix some syntax errors
+python ../transformer.py
 
-a=$(elm-test 2>&1 || true)
+set +e
+a=$(elm-test || true)
 
 set -e
+
 
 ! echo $a | grep -qF "Unhandled exception while running the tests"
 
