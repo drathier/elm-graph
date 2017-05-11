@@ -1,6 +1,7 @@
 module Graph
   exposing
     ( Graph
+    , RelativeOrdering(Before, After, Concurrent)
       -- query
     , getData
     , member
@@ -8,10 +9,14 @@ module Graph
     , incoming
     , outgoing
     , size
+    , keys
     , nodes
     , edges
+    , reachable
+    , relativeOrder
       -- build
     , empty
+    , emptyDag
     , insertNode
     , insertNodeData
     , insertEdge
@@ -43,10 +48,10 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs Graph
 
 # Query
-@docs getData, member, memberEdge, incoming, outgoing, size, nodes, edges, isAcyclic
+@docs getData, member, memberEdge, incoming, outgoing, size, nodes, edges, isAcyclic, reachable, nearestCommonAncestor
 
 # Build
-@docs empty, insertNode, insertNodeData, insertEdge, removeNode, removeEdge
+@docs empty, emptyDag, insertNode, insertNodeData, insertEdge, removeNode, removeEdge
 
 # Transform
 @docs map, foldl, foldr
@@ -77,9 +82,7 @@ import Tuple
 -}
 type Graph comparable a
   = Graph
-      { nodes :
-          Dict comparable (Node comparable a)
-          -- NOTE: flag will only be True if the feature is fully initialized and ready to be used
+      { nodes : Dict comparable (Node comparable a)
       , dagReachabilityState : FeatureState
       }
 
@@ -152,9 +155,52 @@ nodeData data =
 insert : comparable -> Node comparable data -> Graph comparable data -> Graph comparable data
 insert key node (Graph graph) =
   Graph { graph | nodes = Dict.insert key node graph.nodes }
-    |> maintainDagReachability (lazyReachabilityUpdate key)
+    |> ifDynamicDag (updateReachabilityFrom key)
 
 
+--- TODO: plan forward: update reachability on self, then on all incoming, recursively. Use reverse postorder traversal starting at self (including self) and update based on parents.
+
+
+updateReachabilityFrom : comparable -> Graph comparable data -> Graph comparable data
+updateReachabilityFrom key graph =
+  let
+    calculatedReachableNodes : comparable -> Graph comparable data -> Set comparable
+    calculatedReachableNodes key graph =
+      Set.foldl
+        (\key acc -> Set.union acc <| reachable key graph)
+        (outgoing key graph)
+        (outgoing key graph)
+  in
+    if calculatedReachableNodes key graph == reachable key graph then
+      graph
+    else
+      let
+        g =
+          updateNode (\(Node node) -> Node { node | reachable = calculatedReachableNodes key graph }) key graph
+      in
+        Set.foldl updateReachabilityFrom g (incoming key g)
+
+
+debugValue msg b =
+  let
+    x =
+      Debug.log ("-> " ++ msg) ()
+
+    y =
+      b
+  in
+    Debug.log "<- " y
+
+
+debugTag msg b =
+  let
+    x =
+      Debug.log msg ()
+  in
+    b
+
+
+--Debug.log "notEqual" <|
 -- BUILD
 
 
@@ -163,6 +209,13 @@ insert key node (Graph graph) =
 empty : Graph comparable data
 empty =
   Graph { nodes = Dict.empty, dagReachabilityState = Disabled }
+
+
+{-| Create an empty directed acyclic graph.
+-}
+emptyDag : Graph comparable data
+emptyDag =
+  Graph { nodes = Dict.empty, dagReachabilityState = UpToDate }
 
 
 {-| Insert a node. Does not overwrite metadata if node already exists.
@@ -204,8 +257,7 @@ insertEdge ( from, to ) graph =
       graph
         |> insert to (Node { toNode | incoming = Set.insert from toNode.incoming })
         |> insert from (Node { fromNode | outgoing = Set.insert to fromNode.outgoing })
-        |> maintainDagReachability
-            (lazyReachabilityUpdate from >> Maybe.andThen (lazyReachabilityUpdate to))
+        |> ifDynamicDag (updateReachabilityFrom from)
 
 
 getOrCreate key graph =
@@ -232,7 +284,6 @@ removeNode key (Graph graph) =
           Graph { graph | nodes = Dict.remove key graph.nodes }
       in
         List.foldl removeEdge newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
-          |> maintainDagReachability (updateReachability)
 
 
 {-| Remove an edge identified by its source and target keys. No-op if source, target or edge doesn't exist.
@@ -249,104 +300,43 @@ removeEdge ( from, to ) graph =
     graph
       |> updateNode updateIncoming to
       |> updateNode updateOutgoing from
-      |> maintainDagReachability (updateReachability)
 
 
 -- DYNAMIC FEATURES
 
 
-{-| Enable the dynamic reachability optimization for *directed acyclic graphs*. This allows O(log n) queries for the relative ordering of two elements in a partially ordered set, and O(log n) queries for the set of nodes that are reachable from a specific node.
-
-The downside is that modifying the graph now takes O(log n * (nodes before this node)) time on average. Modifying the beginning of the graph is thus quite fast, but inserting an edge at the end takes O(n log n) time. The other downside is that this optimization only works on directed acyclic graphs.
--}
-enableDagReachability : Graph comparable data -> Maybe (Graph comparable data)
-enableDagReachability (Graph graph) =
-  -- NOTE: first update, then mark as enabled
-  updateReachability (Graph graph)
-    |> Maybe.map (\(Graph graph) -> Graph { graph | dagReachabilityState = UpToDate })
-
-
-{-| Disable the dynamic reachability optimization for *directed acyclic graphs*.
--}
-disableDagReachability : Graph comparable data -> Graph comparable data
-disableDagReachability (Graph graph) =
-  Graph { graph | dagReachabilityState = Disabled }
-
-
-dagReachabilityState : Graph comparable data -> FeatureState
-dagReachabilityState (Graph graph) =
-  graph.dagReachabilityState
-
-
-{-| Map over a graph if its DagReachability state is marked as UpToDate, to make sure it's up to date. If its state is Disabled or UpToDateButDisabled, we mark it as Disabled and let it become stale.
--}
-maintainDagReachability : (Graph comparable data -> Maybe (Graph comparable data)) -> Graph comparable data -> Graph comparable data
-maintainDagReachability func (Graph graph) =
-  if graph.dagReachabilityState == UpToDate then
-    func (Graph graph)
-      |> Maybe.withDefault
-          (Graph { graph | dagReachabilityState = Disabled })
+ifDynamicDag : (Graph comparable data -> Graph comparable data) -> Graph comparable data -> Graph comparable data
+ifDynamicDag fn (Graph graph) =
+  if graph.dagReachabilityState == Disabled then
+    Graph graph
   else
-    Graph { graph | dagReachabilityState = Disabled }
+    fn (Graph graph)
 
 
-updateReachability : Graph comparable data -> Maybe (Graph comparable data)
-updateReachability (Graph graph) =
-  case graph.dagReachabilityState of
-    UpToDate ->
-      Just (Graph graph)
+{-
+   {-| Enable the dynamic reachability optimization for *directed acyclic graphs*. This allows O(log n) queries for the relative ordering of two elements in a partially ordered set, and O(log n) queries for the set of nodes that are reachable from a specific node.
 
-    UpToDateButDisabled ->
-      Just (Graph graph)
-
-    Disabled ->
-      topologicalSort (Graph graph)
-        |> Maybe.map
-            (\order ->
-              ((List.foldl
-                  (\key g -> updateNode (\(Node node) -> (Node { node | outgoing = singleStepReachability key g })) key g)
-                  (Graph graph)
-                  order
-               )
-              )
-            )
-        |> Maybe.map
-            (\(Graph graph) ->
-              Graph { graph | dagReachabilityState = UpToDateButDisabled }
-            )
+   The downside is that modifying the graph now takes O(log n * (nodes before this node)) time on average. Modifying the beginning of the graph is thus quite fast, but inserting an edge at the end takes O(n log n) time. The other downside is that this optimization only works on directed acyclic graphs.
+   -}
+   enableDagReachability : Graph comparable data -> Maybe (Graph comparable data)
+   enableDagReachability (Graph graph) =
+     -- NOTE: first update, then mark as enabled
+     updateReachability (Graph graph)
+       |> Maybe.map (\(Graph graph) -> Graph { graph | dagReachabilityState = UpToDate })
 
 
-singleStepReachability : comparable -> Graph comparable data -> Set comparable
-singleStepReachability key g =
-  -- set of nodes reachable from directly connected neighbors over an outgoing edge
-  List.foldl
-    Set.union
-    (get key g
-      |> Maybe.map (\(Node node) -> node.reachable)
-      |> Maybe.withDefault Set.empty
-    )
-    (outgoing key g
-      |> Set.toList
-      |> List.filterMap (\key -> get key g)
-      |> List.map (\(Node node) -> node.reachable)
-    )
+   {-| Disable the dynamic reachability optimization for *directed acyclic graphs*.
+   -}
+   disableDagReachability : Graph comparable data -> Graph comparable data
+   disableDagReachability (Graph graph) =
+     Graph { graph | dagReachabilityState = Disabled }
 
 
-lazyReachabilityUpdate : comparable -> Graph comparable data -> Maybe (Graph comparable data)
-lazyReachabilityUpdate key graph =
-  case get key graph of
-    Nothing ->
-      Debug.crash (toString ( "lost a node", key, graph ))
+   dagReachabilityState : Graph comparable data -> FeatureState
+   dagReachabilityState (Graph graph) =
+     graph.dagReachabilityState
 
-    Just (Node node) ->
-      if singleStepReachability key graph == reachable key graph then
-        -- already up to date; we're done here
-        Just graph
-      else
-        -- give up; update whole graph
-        updateReachability graph
-
-
+-}
 -- QUERY
 
 
@@ -382,6 +372,13 @@ memberEdge ( from, to ) graph =
 nodes : Graph comparable data -> List ( comparable, Maybe data )
 nodes =
   foldl (\key data list -> ( key, data ) :: list) []
+
+
+{-| Get the keys for all nodes in the graph.
+-}
+keys : Graph comparable data -> List comparable
+keys (Graph graph) =
+  Dict.keys graph.nodes
 
 
 {-| Get the (from, to) pair for each edge in the graph.
@@ -431,29 +428,31 @@ isAcyclicHelper topSortedNodes seen graph =
 -}
 reachable : comparable -> Graph comparable data -> Set comparable
 reachable key (Graph graph) =
-  updateReachability (Graph graph)
-    |> Maybe.andThen (get key)
-    |> Maybe.map ((\(Node node) -> node.reachable))
+  Graph graph
+    |> get key
+    |> Maybe.map (\(Node node) -> node.reachable)
     |> Maybe.withDefault Set.empty
 
 
 -- TODO: test!
 
 
-{-| Returns the relative ordering of two keys in a *directed acyclic graph*. If there is a path from a to b over outgoing edges, a is LT b. If there is no path between them, they compare EQ.
+type RelativeOrdering
+  = Before
+  | After
+  | Concurrent
+
+
+{-| Returns the relative ordering of two keys in a *directed acyclic graph*. If there is a path from a to b over outgoing edges, a is Before b. If there is no path between them, they compare EQ.
 -}
-relativeOrder : comparable -> comparable -> Graph comparable data -> Maybe Order
+relativeOrder : comparable -> comparable -> Graph comparable data -> RelativeOrdering
 relativeOrder a b graph =
-  updateReachability graph
-    |> Maybe.map
-        (\graph ->
-          if graph |> reachable a |> Set.member b then
-            LT
-          else if graph |> reachable b |> Set.member b then
-            GT
-          else
-            EQ
-        )
+  if graph |> reachable a |> Set.member b then
+    Before
+  else if graph |> reachable b |> Set.member a then
+    After
+  else
+    Concurrent
 
 
 -- UPDATE
