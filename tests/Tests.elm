@@ -1042,6 +1042,127 @@ all =
                     , Expect.equal (graph |> relativeOrder e d) After
                     ]
         ]
+    , describe "relativeOrder with feature enabled after construction"
+        [ fuzz2 int int "relativeOrder handles direct child" <|
+            \a b ->
+              allDifferent [ a, b ] <|
+                (empty
+                  |> insertEdge ( a, b )
+                  |> enableDagReachability
+                  |> Maybe.map (relativeOrder a b)
+                  |> Expect.equal (Just Before)
+                )
+        , fuzz3 int int int "relativeOrder handles indirect children" <|
+            \a b c ->
+              allDifferent [ a, b, c ] <|
+                let
+                  graph =
+                    (empty
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( b, c )
+                      |> enableDagReachability
+                      |> Maybe.withDefault empty
+                    )
+                in
+                  many
+                    [ Expect.equal (graph |> relativeOrder a b) Before
+                    , Expect.equal (graph |> relativeOrder a c) Before
+                    , Expect.equal (graph |> relativeOrder b a) After
+                    , Expect.equal (graph |> relativeOrder b c) Before
+                    , Expect.equal (graph |> relativeOrder c a) After
+                    , Expect.equal (graph |> relativeOrder c b) After
+                    ]
+        , fuzz5 int int int int int "relativeOrder handles small directed acyclic graphs" <|
+            \a b c d e ->
+              allDifferent [ a, b, c, d, e ] <|
+                let
+                  graph =
+                    (empty
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( b, c )
+                      |> insertEdge ( b, d )
+                      |> insertEdge ( c, e )
+                      |> insertEdge ( d, e )
+                      |> enableDagReachability
+                      |> Maybe.withDefault empty
+                    )
+                in
+                  many
+                    [ -- self-edges
+                      Expect.equal (graph |> relativeOrder a a) Concurrent
+                    , Expect.equal (graph |> relativeOrder b b) Concurrent
+                    , Expect.equal (graph |> relativeOrder c c) Concurrent
+                    , Expect.equal (graph |> relativeOrder d d) Concurrent
+                    , Expect.equal (graph |> relativeOrder e e) Concurrent
+                      -- concurrent
+                    , Expect.equal (graph |> relativeOrder c d) Concurrent
+                    , Expect.equal (graph |> relativeOrder d c) Concurrent
+                      -- before
+                    , Expect.equal (graph |> relativeOrder a b) Before
+                    , Expect.equal (graph |> relativeOrder a c) Before
+                    , Expect.equal (graph |> relativeOrder a d) Before
+                    , Expect.equal (graph |> relativeOrder a e) Before
+                    , Expect.equal (graph |> relativeOrder b c) Before
+                    , Expect.equal (graph |> relativeOrder b d) Before
+                    , Expect.equal (graph |> relativeOrder b e) Before
+                    , Expect.equal (graph |> relativeOrder c e) Before
+                      -- after
+                    , Expect.equal (graph |> relativeOrder b a) After
+                    , Expect.equal (graph |> relativeOrder c a) After
+                    , Expect.equal (graph |> relativeOrder d a) After
+                    , Expect.equal (graph |> relativeOrder e a) After
+                    , Expect.equal (graph |> relativeOrder c b) After
+                    , Expect.equal (graph |> relativeOrder d b) After
+                    , Expect.equal (graph |> relativeOrder e b) After
+                    , Expect.equal (graph |> relativeOrder e c) After
+                    , Expect.equal (graph |> relativeOrder e d) After
+                    ]
+        , fuzz5 int int int int int "relativeOrder handles small directed acyclic graphs" <|
+            \a b c d e ->
+              allDifferent [ a, b, c, d, e ] <|
+                let
+                  graph =
+                    (empty
+                      |> insertEdge ( a, b )
+                      |> insertEdge ( b, c )
+                      |> insertEdge ( b, d )
+                      |> insertEdge ( c, e )
+                      |> enableDagReachability
+                      |> Maybe.withDefault empty
+                      |> insertEdge ( d, e )
+                    )
+                in
+                  many
+                    [ -- self-edges
+                      Expect.equal (graph |> relativeOrder a a) Concurrent
+                    , Expect.equal (graph |> relativeOrder b b) Concurrent
+                    , Expect.equal (graph |> relativeOrder c c) Concurrent
+                    , Expect.equal (graph |> relativeOrder d d) Concurrent
+                    , Expect.equal (graph |> relativeOrder e e) Concurrent
+                      -- concurrent
+                    , Expect.equal (graph |> relativeOrder c d) Concurrent
+                    , Expect.equal (graph |> relativeOrder d c) Concurrent
+                      -- before
+                    , Expect.equal (graph |> relativeOrder a b) Before
+                    , Expect.equal (graph |> relativeOrder a c) Before
+                    , Expect.equal (graph |> relativeOrder a d) Before
+                    , Expect.equal (graph |> relativeOrder a e) Before
+                    , Expect.equal (graph |> relativeOrder b c) Before
+                    , Expect.equal (graph |> relativeOrder b d) Before
+                    , Expect.equal (graph |> relativeOrder b e) Before
+                    , Expect.equal (graph |> relativeOrder c e) Before
+                      -- after
+                    , Expect.equal (graph |> relativeOrder b a) After
+                    , Expect.equal (graph |> relativeOrder c a) After
+                    , Expect.equal (graph |> relativeOrder d a) After
+                    , Expect.equal (graph |> relativeOrder e a) After
+                    , Expect.equal (graph |> relativeOrder c b) After
+                    , Expect.equal (graph |> relativeOrder d b) After
+                    , Expect.equal (graph |> relativeOrder e b) After
+                    , Expect.equal (graph |> relativeOrder e c) After
+                    , Expect.equal (graph |> relativeOrder e d) After
+                    ]
+        ]
     ]
 
 

@@ -22,6 +22,9 @@ module Graph
     , insertEdge
     , removeNode
     , removeEdge
+      -- feature flags
+    , enableDagReachability
+    , disableDagReachability
       -- transformation
     , map
     , foldl
@@ -281,9 +284,12 @@ removeNode key (Graph graph) =
           List.map (\out -> ( key, out )) (Set.toList node.outgoing)
 
         newGraph =
-          Graph { graph | nodes = Dict.remove key graph.nodes }
+          Graph { graph | nodes = Dict.remove key graph.nodes, dagReachabilityState = Disabled }
       in
         List.foldl removeEdge newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
+
+
+-- TODO: figure out where we have to disable dagReachability, or recalculate it
 
 
 {-| Remove an edge identified by its source and target keys. No-op if source, target or edge doesn't exist.
@@ -313,30 +319,30 @@ ifDynamicDag fn (Graph graph) =
     fn (Graph graph)
 
 
-{-
-   {-| Enable the dynamic reachability optimization for *directed acyclic graphs*. This allows O(log n) queries for the relative ordering of two elements in a partially ordered set, and O(log n) queries for the set of nodes that are reachable from a specific node.
+{-| Enable the dynamic reachability optimization for *directed acyclic graphs*. This allows O(log n) queries for the relative ordering of two elements in a partially ordered set, and O(log n) queries for the set of nodes that are reachable from a specific node.
 
-   The downside is that modifying the graph now takes O(log n * (nodes before this node)) time on average. Modifying the beginning of the graph is thus quite fast, but inserting an edge at the end takes O(n log n) time. The other downside is that this optimization only works on directed acyclic graphs.
-   -}
-   enableDagReachability : Graph comparable data -> Maybe (Graph comparable data)
-   enableDagReachability (Graph graph) =
-     -- NOTE: first update, then mark as enabled
-     updateReachability (Graph graph)
-       |> Maybe.map (\(Graph graph) -> Graph { graph | dagReachabilityState = UpToDate })
-
-
-   {-| Disable the dynamic reachability optimization for *directed acyclic graphs*.
-   -}
-   disableDagReachability : Graph comparable data -> Graph comparable data
-   disableDagReachability (Graph graph) =
-     Graph { graph | dagReachabilityState = Disabled }
-
-
-   dagReachabilityState : Graph comparable data -> FeatureState
-   dagReachabilityState (Graph graph) =
-     graph.dagReachabilityState
-
+The downside is that modifying the graph now takes O(log n * (nodes before this node)) time on average. Modifying the beginning of the graph is thus quite fast, but inserting an edge at the end takes O(n log n) time. The other downside is that this optimization only works on directed acyclic graphs.
 -}
+enableDagReachability : Graph comparable data -> Maybe (Graph comparable data)
+enableDagReachability (Graph graph) =
+  -- NOTE: first update, then mark as enabled
+  updateReachability (Graph graph)
+    |> Maybe.map (\(Graph graph) -> Graph { graph | dagReachabilityState = UpToDate })
+
+
+{-| Disable the dynamic reachability optimization for *directed acyclic graphs*.
+-}
+disableDagReachability : Graph comparable data -> Graph comparable data
+disableDagReachability (Graph graph) =
+  Graph { graph | dagReachabilityState = Disabled }
+
+
+updateReachability : Graph comparable data -> Maybe (Graph comparable data)
+updateReachability graph =
+  topologicalSort graph
+    |> Maybe.map (List.foldl updateReachabilityFrom graph)
+
+
 -- QUERY
 
 
