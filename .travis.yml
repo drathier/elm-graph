@@ -42,53 +42,27 @@ install:
   - cd ..
 
 script:
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
+  - elm-test
