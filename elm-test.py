@@ -16,7 +16,10 @@ try:  # windows
     x = subprocess.run([os.environ['USERPROFILE'] + r"\AppData\Roaming\npm\elm-test.cmd", "--stack-trace-limit=300"], stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE)
 except:  # macos / linux
-    x = subprocess.run([r"/usr/local/bin/elm-test", "--stack-trace-limit=300"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        x = subprocess.run([r"/usr/local/bin/elm-test", "--stack-trace-limit=300"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except:  # travis ci
+        x = subprocess.run([r"elm-test", "--stack-trace-limit=300"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 print("#stdout#")
 sys.stdout.write(x.stdout.decode("utf-8"))
