@@ -1,5 +1,6 @@
 sudo: false
 
+language: python
 cache:
   directories:
     - tests/elm-stuff/build-artifacts
@@ -43,26 +44,4 @@ install:
 
 script:
   - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
-  - elm-test
+  - python elm-test.py
