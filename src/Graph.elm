@@ -312,6 +312,11 @@ disableDagReachability (Graph graph) =
     |> validate (Debug.crash)
 
 
+dagReachabilityState : Graph comparable data -> FeatureState
+dagReachabilityState (Graph graph) =
+  graph.dagReachabilityState
+
+
 updateReachability : Graph comparable data -> Maybe (Graph comparable data)
 updateReachability graph =
   topologicalSort graph
@@ -696,10 +701,10 @@ nearestCommonAncestor sources graph =
 validate : (String -> Graph comparable data) -> Graph comparable data -> Graph comparable data
 validate crash graph =
   let
-    noDanglingOutgoingEdges key =
+    hasDanglingOutgoingEdges key =
       (outgoing key graph) |> Set.toList |> List.map (\key -> incoming key graph) |> List.all (Set.member key) |> not
 
-    noDanglingIncomingEdges key =
+    hasDanglingIncomingEdges key =
       (incoming key graph) |> Set.toList |> List.map (\key -> outgoing key graph) |> List.all (Set.member key) |> not
 
     xreachable : comparable -> Set comparable
@@ -709,18 +714,18 @@ validate crash graph =
         |> Maybe.map (\(Node node) -> node.reachable)
         |> Maybe.withDefault Set.empty
 
-    reachabilityCacheIsOk key =
+    reachabilityCacheIsStale key =
       xreachable key
         == (List.foldl Set.union (outgoing key graph) <|
               List.map (\key -> xreachable key) <|
                 (Set.toList <| outgoing key graph)
            )
   in
-    if keys graph |> List.any noDanglingOutgoingEdges then
+    if keys graph |> List.any hasDanglingOutgoingEdges then
       crash (toString ( "found dangling outgoing edge", graph ))
-    else if keys graph |> List.any noDanglingIncomingEdges then
+    else if keys graph |> List.any hasDanglingIncomingEdges then
       crash (toString ( "found dangling incoming edge", graph ))
-    else if keys graph |> List.any reachabilityCacheIsOk then
+    else if (dagReachabilityState graph == UpToDate) && (keys graph |> List.any reachabilityCacheIsStale) then
       crash (toString ( "reachability cache is not up to date", graph ))
     else
       graph
