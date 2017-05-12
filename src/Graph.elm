@@ -702,20 +702,19 @@ validate crash graph =
     noDanglingIncomingEdges key =
       (incoming key graph) |> Set.toList |> List.map (\key -> outgoing key graph) |> List.all (Set.member key) |> not
 
+    xreachable : comparable -> Set comparable
+    xreachable key =
+      graph
+        |> get key
+        |> Maybe.map (\(Node node) -> node.reachable)
+        |> Maybe.withDefault Set.empty
+
     reachabilityCacheIsOk key =
-      let
-        xreachable : comparable -> Set comparable
-        xreachable key =
-          graph
-            |> get key
-            |> Maybe.map (\(Node node) -> node.reachable)
-            |> Maybe.withDefault Set.empty
-      in
-        xreachable key
-          == (List.foldl Set.union (outgoing key graph) <|
-                List.map (\key -> xreachable key) <|
-                  (Set.toList <| outgoing key graph)
-             )
+      xreachable key
+        == (List.foldl Set.union (outgoing key graph) <|
+              List.map (\key -> xreachable key) <|
+                (Set.toList <| outgoing key graph)
+           )
   in
     if keys graph |> List.any noDanglingOutgoingEdges then
       crash (toString ( "found dangling outgoing edge", graph ))
