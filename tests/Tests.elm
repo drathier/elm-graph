@@ -838,7 +838,7 @@ all =
     , describe "topSort"
         [ fuzz acyclicGraphFuzzer "topSort doesn't violate any partial orderings" <|
             \graph ->
-              case graph |> topologicalSort of
+              case graph |> validate Debug.crash |> topologicalSort of
                 Nothing ->
                   Expect.fail "Failed to generate a valid topological sort; is input acyclic?"
 
@@ -1117,7 +1117,7 @@ all =
                     , Expect.equal (graph |> relativeOrder e c) After
                     , Expect.equal (graph |> relativeOrder e d) After
                     ]
-        , fuzz5 int int int int int "relativeOrder handles small directed acyclic graphs" <|
+        , fuzz5 int int int int int "relativeOrder handles small directed acyclic graphs, feature enabled mid-construction" <|
             \a b c d e ->
               allDifferent [ a, b, c, d, e ] <|
                 let
