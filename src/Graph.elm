@@ -722,45 +722,37 @@ nearestCommonAncestor sources graph =
 -}
 validate : (String -> Graph comparable data) -> Graph comparable data -> Graph comparable data
 validate crash graph =
-  debugTag
-    (case graph of
-      Graph g ->
-        toString g.id
-    )
-  <|
-    let
-      hasDanglingOutgoingEdges key =
-        (outgoing key graph) |> Set.toList |> List.map (\key -> incoming key graph) |> List.all (Set.member key) |> not
+  let
+    hasDanglingOutgoingEdges key =
+      (outgoing key graph) |> Set.toList |> List.map (\key -> incoming key graph) |> List.all (Set.member key) |> not
 
-      hasDanglingIncomingEdges key =
-        (incoming key graph) |> Set.toList |> List.map (\key -> outgoing key graph) |> List.all (Set.member key) |> not
+    hasDanglingIncomingEdges key =
+      (incoming key graph) |> Set.toList |> List.map (\key -> outgoing key graph) |> List.all (Set.member key) |> not
 
-      reachable : comparable -> Set comparable
-      reachable key =
-        graph
-          |> get key
-          |> Maybe.map (\(Node node) -> node.reachable)
-          |> Maybe.withDefault Set.empty
+    reachable : comparable -> Set comparable
+    reachable key =
+      graph
+        |> get key
+        |> Maybe.map (\(Node node) -> node.reachable)
+        |> Maybe.withDefault Set.empty
 
-      reachabilityCacheIsStale key =
-        (outgoing key graph /= Set.empty)
-          && (reachable key
-                /= Debug.log "foldld"
-                    (List.foldl
-                      Set.union
-                      (outgoing key graph)
-                     <|
-                      Debug.log "mapped" <|
-                        List.map (\key -> reachable key) <|
-                          (Set.toList <| outgoing key graph)
-                    )
-             )
-    in
-      if keys graph |> List.any hasDanglingOutgoingEdges then
-        crash (toString ( "found dangling outgoing edge", graph ))
-      else if keys graph |> List.any hasDanglingIncomingEdges then
-        crash (toString ( "found dangling incoming edge", graph ))
-      else if (dagReachabilityState graph == UpToDate) && (keys graph |> List.any reachabilityCacheIsStale) then
-        crash (toString ( "reachability cache is not up to date", graph ))
-      else
-        graph
+    reachabilityCacheIsStale key =
+      (outgoing key graph /= Set.empty)
+        && (reachable key
+              /= (List.foldl
+                    Set.union
+                    (outgoing key graph)
+                  <|
+                    List.map (\key -> reachable key) <|
+                      (Set.toList <| outgoing key graph)
+                 )
+           )
+  in
+    if keys graph |> List.any hasDanglingOutgoingEdges then
+      crash (toString ( "found dangling outgoing edge", graph ))
+    else if keys graph |> List.any hasDanglingIncomingEdges then
+      crash (toString ( "found dangling incoming edge", graph ))
+    else if (dagReachabilityState graph == UpToDate) && (keys graph |> List.any reachabilityCacheIsStale) then
+      crash (toString ( "reachability cache is not up to date", graph ))
+    else
+      graph
