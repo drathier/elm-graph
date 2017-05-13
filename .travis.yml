@@ -11,7 +11,7 @@ cache:
 
 os:
   - linux
-  - osx
+  #- osx # python + osx is not working on travis yet
 
 env:
   matrix:

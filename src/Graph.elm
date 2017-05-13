@@ -178,7 +178,6 @@ setTag tag (Graph graph) =
 empty : Graph comparable data
 empty =
   Graph { nodes = Dict.empty, dagReachabilityState = Disabled, id = 0 }
-    |> validate (Debug.crash)
 
 
 {-| Create an empty directed acyclic graph.
@@ -186,7 +185,6 @@ empty =
 emptyDag : Graph comparable data
 emptyDag =
   Graph { nodes = Dict.empty, dagReachabilityState = UpToDate, id = 0 }
-    |> validate (Debug.crash)
 
 
 {-| Insert a node. Does not overwrite metadata if node already exists.
