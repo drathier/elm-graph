@@ -3,6 +3,7 @@ module Graph
     ( Graph
     , RelativeOrdering(Before, After, Concurrent)
     , validate
+    , setTag
       -- query
     , getData
     , member
@@ -86,7 +87,8 @@ import Tuple
 -}
 type Graph comparable a
   = Graph
-      { nodes : Dict comparable (Node comparable a)
+      { id : Int
+      , nodes : Dict comparable (Node comparable a)
       , dagReachabilityState : FeatureState
       }
 
@@ -166,11 +168,16 @@ insert key node (Graph graph) =
 -- BUILD
 
 
+setTag : Int -> Graph comparable data -> Graph comparable data
+setTag tag (Graph graph) =
+  Graph { graph | id = tag }
+
+
 {-| Create an empty graph.
 -}
 empty : Graph comparable data
 empty =
-  Graph { nodes = Dict.empty, dagReachabilityState = Disabled }
+  Graph { nodes = Dict.empty, dagReachabilityState = Disabled, id = 0 }
     |> validate (Debug.crash)
 
 
@@ -178,7 +185,7 @@ empty =
 -}
 emptyDag : Graph comparable data
 emptyDag =
-  Graph { nodes = Dict.empty, dagReachabilityState = UpToDate }
+  Graph { nodes = Dict.empty, dagReachabilityState = UpToDate, id = 0 }
     |> validate (Debug.crash)
 
 
@@ -194,8 +201,19 @@ insertNode key graph =
 -}
 insertNodeData : comparable -> data -> Graph comparable data -> Graph comparable data
 insertNodeData key data (Graph graph) =
-  Graph { graph | nodes = Dict.insert key (nodeData data) graph.nodes }
-    |> validate (Debug.crash)
+  case getOrCreate key (Graph graph) of
+    Node node ->
+      Graph
+        { graph
+          | nodes =
+              Dict.insert key
+                (Node { node | data = Just data })
+                graph.nodes
+        }
+        |> validate (Debug.crash)
+
+
+-- TODO: refactor using an "update if exists, otherwise insert and then update" function
 
 
 {-| Insert an edge between two nodes. Creates any nodes that do not already exist.
@@ -224,7 +242,9 @@ insertEdge ( from, to ) graph =
         |> insert to (Node { toNode | incoming = Set.insert from toNode.incoming })
         |> insert from (Node { fromNode | outgoing = Set.insert to fromNode.outgoing })
         |> ifDynamicDag (updateReachabilityFrom from)
-        |> validate (Debug.crash)
+
+
+--|> validate (Debug.crash)
 
 
 getOrCreate key graph =
@@ -283,10 +303,8 @@ ifDynamicDag : (Graph comparable data -> Graph comparable data) -> Graph compara
 ifDynamicDag fn (Graph graph) =
   if graph.dagReachabilityState == Disabled then
     Graph graph
-      |> validate (Debug.crash)
   else
     fn (Graph graph)
-      |> validate (Debug.crash)
 
 
 {-| Enable the dynamic reachability optimization for *directed acyclic graphs*. This allows O(log n) queries for the relative ordering of two elements in a partially ordered set, and O(log n) queries for the set of nodes that are reachable from a specific node.
@@ -295,12 +313,12 @@ The downside is that modifying the graph now takes O(log n * (nodes before this 
 -}
 enableDagReachability : Graph comparable data -> Maybe (Graph comparable data)
 enableDagReachability (Graph graph) =
-  -- NOTE: first update, then mark as enabled
+  -- NOTE: first mark as enabled, then update, to avoid loops
   if graph.dagReachabilityState /= Disabled then
     Just <| Graph { graph | dagReachabilityState = UpToDate }
   else
-    updateReachability (Graph graph)
-      |> Maybe.map (\(Graph graph) -> Graph { graph | dagReachabilityState = UpToDate })
+    Graph { graph | dagReachabilityState = UpToDate }
+      |> updateReachability
       |> Maybe.map (validate Debug.crash)
 
 
@@ -326,6 +344,7 @@ updateReachability graph =
 
 updateReachabilityFrom : comparable -> Graph comparable data -> Graph comparable data
 updateReachabilityFrom key graph =
+  -- TODO: does this really traverse all the way on all insert orderings?
   let
     calculatedReachableNodes : comparable -> Graph comparable data -> Set comparable
     calculatedReachableNodes key graph =
@@ -342,7 +361,6 @@ updateReachabilityFrom key graph =
           updateNode (\(Node node) -> Node { node | reachable = calculatedReachableNodes key graph }) key graph
       in
         Set.foldl updateReachabilityFrom g (incoming key g)
-          |> validate (Debug.crash)
 
 
 maintainReachabilityOrDisable : Graph comparable data -> Graph comparable data
@@ -463,12 +481,14 @@ isAcyclicHelper topSortedNodes seen graph =
 {-| Get the set of reachable nodes from a key, following outgoing edges any number of steps.
 -}
 reachable : comparable -> Graph comparable data -> Set comparable
-reachable key (Graph graph) =
-  Graph graph
-    |> validate (Debug.crash)
-    |> enableDagReachability
-    |> Maybe.map (validate Debug.crash)
-    |> Maybe.andThen (get key)
+reachable key graph =
+  graph
+    --|> validate (Debug.crash)
+    |>
+      enableDagReachability
+    --|> Maybe.map (validate Debug.crash)
+    |>
+      Maybe.andThen (get key)
     |> Maybe.map (\(Node node) -> node.reachable)
     |> Maybe.withDefault Set.empty
 
@@ -546,8 +566,8 @@ partition func (Graph graph) =
         ( left, Dict.insert key (Node node) right )
   in
     Dict.foldl add ( Dict.empty, Dict.empty ) graph.nodes
-      |> Tuple.mapFirst (\x -> Graph { dagReachabilityState = Disabled, nodes = x })
-      |> Tuple.mapSecond (\x -> Graph { dagReachabilityState = Disabled, nodes = x })
+      |> Tuple.mapFirst (\x -> Graph { dagReachabilityState = Disabled, nodes = x, id = graph.id })
+      |> Tuple.mapSecond (\x -> Graph { dagReachabilityState = Disabled, nodes = x, id = -graph.id })
       |> Tuple.mapFirst cleanup
       |> Tuple.mapSecond cleanup
       |> Tuple.mapFirst (validate Debug.crash)
@@ -578,6 +598,7 @@ union : Graph comparable data -> Graph comparable data -> Graph comparable data
 union (Graph a) (Graph b) =
   Graph
     { dagReachabilityState = Disabled
+    , id = a.id
     , nodes =
         Dict.merge
           (\key node dict -> Dict.insert key node dict)
@@ -607,6 +628,7 @@ intersect : Graph comparable data -> Graph comparable data -> Graph comparable d
 intersect (Graph a) (Graph b) =
   Graph
     { dagReachabilityState = Disabled
+    , id = a.id
     , nodes =
         Dict.merge
           (\key node dict -> dict)
@@ -661,7 +683,7 @@ postOrder graph =
 reversePostOrder : Graph comparable data -> List comparable
 reversePostOrder (Graph graph) =
   Tuple.second <|
-    reversePostOrderHelper (Dict.keys graph.nodes) [] Set.empty (Graph graph |> validate (Debug.crash))
+    reversePostOrderHelper (Dict.keys graph.nodes) [] Set.empty (Graph graph)
 
 
 reversePostOrderHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data -> ( Set comparable, List comparable )
@@ -700,32 +722,45 @@ nearestCommonAncestor sources graph =
 -}
 validate : (String -> Graph comparable data) -> Graph comparable data -> Graph comparable data
 validate crash graph =
-  let
-    hasDanglingOutgoingEdges key =
-      (outgoing key graph) |> Set.toList |> List.map (\key -> incoming key graph) |> List.all (Set.member key) |> not
+  debugTag
+    (case graph of
+      Graph g ->
+        toString g.id
+    )
+  <|
+    let
+      hasDanglingOutgoingEdges key =
+        (outgoing key graph) |> Set.toList |> List.map (\key -> incoming key graph) |> List.all (Set.member key) |> not
 
-    hasDanglingIncomingEdges key =
-      (incoming key graph) |> Set.toList |> List.map (\key -> outgoing key graph) |> List.all (Set.member key) |> not
+      hasDanglingIncomingEdges key =
+        (incoming key graph) |> Set.toList |> List.map (\key -> outgoing key graph) |> List.all (Set.member key) |> not
 
-    xreachable : comparable -> Set comparable
-    xreachable key =
-      graph
-        |> get key
-        |> Maybe.map (\(Node node) -> node.reachable)
-        |> Maybe.withDefault Set.empty
+      reachable : comparable -> Set comparable
+      reachable key =
+        graph
+          |> get key
+          |> Maybe.map (\(Node node) -> node.reachable)
+          |> Maybe.withDefault Set.empty
 
-    reachabilityCacheIsStale key =
-      xreachable key
-        == (List.foldl Set.union (outgoing key graph) <|
-              List.map (\key -> xreachable key) <|
-                (Set.toList <| outgoing key graph)
-           )
-  in
-    if keys graph |> List.any hasDanglingOutgoingEdges then
-      crash (toString ( "found dangling outgoing edge", graph ))
-    else if keys graph |> List.any hasDanglingIncomingEdges then
-      crash (toString ( "found dangling incoming edge", graph ))
-    else if (dagReachabilityState graph == UpToDate) && (keys graph |> List.any reachabilityCacheIsStale) then
-      crash (toString ( "reachability cache is not up to date", graph ))
-    else
-      graph
+      reachabilityCacheIsStale key =
+        (outgoing key graph /= Set.empty)
+          && (reachable key
+                /= Debug.log "foldld"
+                    (List.foldl
+                      Set.union
+                      (outgoing key graph)
+                     <|
+                      Debug.log "mapped" <|
+                        List.map (\key -> reachable key) <|
+                          (Set.toList <| outgoing key graph)
+                    )
+             )
+    in
+      if keys graph |> List.any hasDanglingOutgoingEdges then
+        crash (toString ( "found dangling outgoing edge", graph ))
+      else if keys graph |> List.any hasDanglingIncomingEdges then
+        crash (toString ( "found dangling incoming edge", graph ))
+      else if (dagReachabilityState graph == UpToDate) && (keys graph |> List.any reachabilityCacheIsStale) then
+        crash (toString ( "reachability cache is not up to date", graph ))
+      else
+        graph
