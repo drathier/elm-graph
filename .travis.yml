@@ -1,5 +1,9 @@
 sudo: false
 
+language: python
+python:
+  - "3.5"
+
 cache:
   directories:
     - tests/elm-stuff/build-artifacts
@@ -7,12 +11,14 @@ cache:
 
 os:
   - linux
-  - osx
+  #- osx # python + osx is not working on travis yet
 
 env:
   matrix:
     - ELM_VERSION=0.18.0 TARGET_NODE_VERSION=node
     - ELM_VERSION=0.18.0 TARGET_NODE_VERSION=4.0
+    - ELM_VERSION=0.18.0-beta TARGET_NODE_VERSION=node
+    - ELM_VERSION=0.18.0-beta TARGET_NODE_VERSION=4.0
 
 before_install:
   - if [ ${TRAVIS_OS_NAME} == "osx" ];
@@ -33,65 +39,14 @@ install:
   - nvm use $TARGET_NODE_VERSION
   - node --version
   - npm --version
-  - npm install -g elm-use elm-test
-  - elm-use $ELM_VERSION
+  - cd tests
+  - npm install -g elm@$ELM_VERSION elm-test
   - mv $(npm config get prefix)/bin/elm-make $(npm config get prefix)/bin/elm-make-old
   - printf '%s\n\n' '#!/bin/bash' 'echo "Running elm-make with sysconfcpus -n 2"' '$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 elm-make-old "$@"' > $(npm config get prefix)/bin/elm-make
   - chmod +x $(npm config get prefix)/bin/elm-make
-  - travis_retry elm-package install --yes
-  - cd tests
-  - npm install
-  - travis_retry elm-package install --yes
+  - elm-package install --yes
   - cd ..
 
 script:
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
-  - npm test
+  - elm-test
+  - python elm-test.py

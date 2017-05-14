@@ -4,7 +4,7 @@ import Dict exposing (Dict)
 import List.Extra
 import Random.Pcg exposing (..)
 import Fuzz exposing (Fuzzer)
-import Graph as G exposing (Graph, empty)
+import Graph as G exposing (Graph, empty, emptyDag, setTag, validate)
 import Set
 import Shrink exposing (Shrinker)
 
@@ -14,24 +14,24 @@ import Shrink exposing (Shrinker)
 
 acyclicGraphFuzzer : Fuzzer (Graph Int data)
 acyclicGraphFuzzer =
-  Fuzz.custom (graphGenerator (edgeGenerator (<))) (graphShrinker (<))
+  Fuzz.custom (graphGenerator (setTag 47114 emptyDag) (edgeGenerator (<))) (graphShrinker (setTag 47124 emptyDag) (<))
 
 
 acyclicGraphFuzzerWithSelfEdges : Fuzzer (Graph Int data)
 acyclicGraphFuzzerWithSelfEdges =
-  Fuzz.custom (graphGenerator (edgeGenerator (<=))) (graphShrinker (<=))
+  Fuzz.custom (graphGenerator (setTag 47112 empty) (edgeGenerator (<=))) (graphShrinker (setTag 47122 empty) (<=))
 
 
 graphFuzzer : Fuzzer (Graph Int data)
 graphFuzzer =
-  Fuzz.custom (graphGenerator (edgeGenerator (\_ _ -> True))) (graphShrinker (\_ _ -> True))
+  Fuzz.custom (graphGenerator (setTag 47113 empty) (edgeGenerator (\_ _ -> True))) (graphShrinker (setTag 47123 empty) (\_ _ -> True))
 
 
 -- Shrinking
 
 
-graphShrinker : (Int -> Int -> Bool) -> Shrinker (Graph Int data)
-graphShrinker edgePredicate =
+graphShrinker : Graph Int data -> (Int -> Int -> Bool) -> Shrinker (Graph Int data)
+graphShrinker empty edgePredicate =
   let
     toGraph =
       List.foldl G.insertEdge empty
@@ -53,9 +53,10 @@ graphShrinker edgePredicate =
 
 
 graphGenerator :
-  (List Int -> Generator (List ( Int, Int )))
+  Graph Int data
+  -> (List Int -> Generator (List ( Int, Int )))
   -> Generator (Graph Int data)
-graphGenerator edgeGenerator =
+graphGenerator empty edgeGenerator =
   -- NOTE: the 0, 100 range is hard coded in multiple places in this file
   int 0 20
     |> andThen (\n -> list n (int 0 100))
@@ -68,6 +69,7 @@ graphGenerator edgeGenerator =
             )
             (edgeGenerator keys)
         )
+    |> map (validate Debug.crash)
 
 
 edgeGenerator : (Int -> Int -> Bool) -> List Int -> Generator (List ( Int, Int ))
