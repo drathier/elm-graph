@@ -1,14 +1,24 @@
 module Tests exposing (..)
 
+import Graph.RelativeOrdering exposing (RelativeOrdering(After, Before, Concurrent))
 import List.Extra
 import Maybe.Extra
 import Test exposing (..)
 import Expect
 import Fuzz exposing (list, int, tuple, string)
 import String
-import Graph exposing (..)
+import Graph.Internal exposing (..)
 import Set
 import GraphFuzzer exposing (acyclicGraphFuzzer, acyclicGraphFuzzerWithSelfEdges, graphFuzzer)
+
+
+emptyDag =
+  case empty |> enableDagReachability of
+    Just g ->
+      g
+
+    Nothing ->
+      Debug.crash "how did we fail at enabling DAG reachability on an empty graph?"
 
 
 many : List Expect.Expectation -> Expect.Expectation
@@ -234,7 +244,6 @@ all =
                 |> validate (Debug.crash)
                 |> always Expect.pass
         ]
-      -- FIXME: this sanity test seems to be ok, so what is causing the crash in Graph:reachable:487?
     , describe "member"
         [ fuzz int "Member check for members returns true" <|
             \key ->

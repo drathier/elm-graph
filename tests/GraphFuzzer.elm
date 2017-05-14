@@ -4,9 +4,18 @@ import Dict exposing (Dict)
 import List.Extra
 import Random.Pcg exposing (..)
 import Fuzz exposing (Fuzzer)
-import Graph as G exposing (Graph, empty, emptyDag, setTag, validate)
+import Graph.Internal as G exposing (Graph, empty, setTag, validate)
 import Set
 import Shrink exposing (Shrinker)
+
+
+emptyDag =
+  case G.empty |> G.enableDagReachability of
+    Just g ->
+      g
+
+    Nothing ->
+      Debug.crash "how did we fail at enabling DAG reachability on an empty graph?"
 
 
 -- Fuzzing
