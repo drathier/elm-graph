@@ -1,6 +1,6 @@
 {
     "version": "1.0.0",
-    "summary": "Simple functional graph library.",
+    "summary": "Simple graph library.",
     "repository": "https://github.com/drathier/elm-graph.git",
     "license": "BSD3",
     "source-directories": [
