@@ -3,6 +3,7 @@ module Tests exposing (..)
 import Graph.RelativeOrdering exposing (RelativeOrdering(After, Before, Concurrent))
 import List.Extra
 import Maybe.Extra
+import RandomTests exposing (randomTests)
 import Test exposing (..)
 import Expect
 import Fuzz exposing (list, int, tuple, string)
@@ -10,77 +11,18 @@ import String
 import Graph.Internal exposing (..)
 import Set
 import GraphFuzzer exposing (acyclicGraphFuzzer, acyclicGraphFuzzerWithSelfEdges, graphFuzzer)
-
-
-emptyDag =
-  case empty |> enableDagReachability of
-    Just g ->
-      g
-
-    Nothing ->
-      Debug.crash "how did we fail at enabling DAG reachability on an empty graph?"
-
-
-many : List Expect.Expectation -> Expect.Expectation
-many expectations =
-  case expectations of
-    [] ->
-      Expect.pass
-
-    expectation :: expectations ->
-      case Expect.getFailure expectation of
-        Nothing ->
-          many expectations
-
-        Just _ ->
-          expectation
-
-
-todo a =
-  test a <| \() -> Expect.equal "" a
-
-
-allDifferent lst expectation =
-  case lst of
-    x :: xs ->
-      if List.map (\a -> a == x) xs |> List.member True then
-        Expect.pass
-      else
-        allDifferent xs expectation
-
-    [] ->
-      expectation
-
-
--- TopSort
-
-
-checkComesBefore : a -> a -> List a -> Expect.Expectation
-checkComesBefore first second list =
-  if first == second then
-    Expect.pass
-  else
-    case list of
-      [] ->
-        Expect.fail ("expected to find " ++ toString first)
-
-      head :: tail ->
-        if head == first then
-          List.member second tail |> Expect.true ("expected " ++ toString first ++ " to come before " ++ toString second)
-        else
-          checkComesBefore first second tail
-
-
-checkPartialOrdering : List ( a, a ) -> List a -> Expect.Expectation
-checkPartialOrdering constraintList ordering =
-  (constraintList
-    |> List.map (\( a, b ) -> checkComesBefore a b ordering)
-    |> many
-  )
+import TestUtils exposing (allDifferent, checkPartialOrdering, emptyDag, many)
 
 
 all : Test
 all =
+  describe "All tests for Graph"
+    [ graphTests
+    , randomTests
+    ]
+
+
+graphTests =
   describe "Graph tests"
     [ describe "insertNode"
         [ fuzz int "Insert a node with a random int id" <|
@@ -940,17 +882,23 @@ all =
                     Expect.fail ("Got an ordering despite input having loops" ++ toString order)
         ]
     , describe "isAcyclic"
-        [ test "isAcyclic returns True for single edge" <|
+        [ test "isAcyclic returns True for empty graph" <|
             \() ->
               empty
                 |> setTag 51
+                |> isAcyclic
+                |> Expect.true "empty graph should be acyclic"
+        , test "isAcyclic returns True for single edge" <|
+            \() ->
+              empty
+                |> setTag 52
                 |> insertEdge ( 0, 1 )
                 |> isAcyclic
                 |> Expect.true "directed acyclic graph should be acyclic"
         , test "isAcyclic returns True for simple tree" <|
             \() ->
               empty
-                |> setTag 52
+                |> setTag 53
                 |> insertEdge ( 0, 1 )
                 |> insertEdge ( 0, 2 )
                 |> isAcyclic

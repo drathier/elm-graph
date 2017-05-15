@@ -23,7 +23,7 @@ except:  # macos / linux
 
 print("#stdout#")
 sleep(0.2)
-sys.stdout.write(x.stdout.decode("utf-8")[-10000:])
+sys.stdout.write(x.stdout.decode("utf-8")[-50000:])
 sleep(0.2)
 print("#stdout#")
 stderr = x.stderr.decode("utf-8")
