@@ -111,8 +111,8 @@ import Set exposing (Set)
 
 {-| A directed graph. `Graph Int String` is a graph that uses `Int`s for identifying its nodes, and lets you store a `String` on each node.
 -}
-type alias Graph =
-  I.Graph
+type alias Graph comparable data =
+  I.Graph comparable data
 
 
 -- NODE
