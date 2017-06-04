@@ -21,12 +21,10 @@ many expectations =
       Expect.pass
 
     expectation :: expectations ->
-      case Expect.getFailure expectation of
-        Nothing ->
-          many expectations
-
-        Just _ ->
-          expectation
+      if expectation == Expect.pass then
+        many expectations
+      else
+        expectation
 
 
 todo a =
