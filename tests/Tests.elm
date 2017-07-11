@@ -38,7 +38,6 @@ graphTests =
         [ fuzz int "Insert a node with a random int id" <|
             \key ->
               empty
-                |> setTag 1
                 |> insertNode key
                 |> member key
                 |> Expect.true "inserted node isn't a member"
@@ -49,7 +48,6 @@ graphTests =
                   ( key1, key2 )
               in
                 empty
-                  |> setTag 2
                   |> insertNode key
                   |> member key
                   |> Expect.true "inserted node isn't a member"
@@ -58,7 +56,6 @@ graphTests =
         [ fuzz int "Remove a node with a random int id" <|
             \key ->
               empty
-                |> setTag 3
                 |> insertNode key
                 |> removeNode key
                 |> member key
@@ -69,7 +66,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 4
                       |> insertNode a
                 in
                   graph
@@ -80,21 +76,18 @@ graphTests =
         [ fuzz2 int string "InsertNodeData creates the node if it doesn't exist" <|
             \key data ->
               empty
-                |> setTag 5
                 |> insertNodeData key data
                 |> member key
                 |> Expect.true "insertNodeData should've inserted a node"
         , fuzz2 int string "Node metadata gets stored in the graph" <|
             \key data ->
               empty
-                |> setTag 6
                 |> insertNodeData key data
                 |> getData key
                 |> Expect.equal (Just data)
         , fuzz2 int string "inserting an existing node doesn't remove metadata" <|
             \key data ->
               empty
-                |> setTag 7
                 |> insertNodeData key data
                 |> insertNode key
                 |> getData key
@@ -102,7 +95,6 @@ graphTests =
         , fuzz2 int string "Node metadata doesn't have to be comparable" <|
             \key data ->
               empty
-                |> setTag 8
                 |> insertNodeData key { data = data }
                 |> getData key
                 |> Expect.equal (Just { data = data })
@@ -113,12 +105,11 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 9
                     |> insertNodeData key { data = key }
                     |> insertEdge ( key, key )
               in
                 many
-                  [ Expect.notEqual graph (empty |> setTag 9)
+                  [ Expect.notEqual graph empty
                   , Set.singleton key |> Expect.equal (outgoing key graph)
                   , Set.singleton key |> Expect.equal (incoming key graph)
                   , Just { data = key } |> Expect.equal (getData key graph)
@@ -131,13 +122,12 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 11
                       |> insertNodeData from { data = from }
                       |> insertNodeData to { data = to }
                       |> insertEdge ( from, to )
                 in
                   many
-                    [ Expect.notEqual graph (empty |> setTag 11)
+                    [ Expect.notEqual graph empty
                     , Set.singleton to |> Expect.equal (outgoing from graph)
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Just { data = from } |> Expect.equal (getData from graph)
@@ -150,12 +140,11 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 13
                       |> insertNodeData to { data = to }
                       |> insertEdge ( from, to )
                 in
                   many
-                    [ Expect.notEqual graph (empty |> setTag 13)
+                    [ Expect.notEqual graph empty
                     , Set.singleton to |> Expect.equal (outgoing from graph)
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Nothing |> Expect.equal (getData from graph)
@@ -168,12 +157,11 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 15
                       |> insertNodeData from { data = from }
                       |> insertEdge ( from, to )
                 in
                   many
-                    [ Expect.notEqual graph (empty |> setTag 15)
+                    [ Expect.notEqual graph empty
                     , Set.singleton to |> Expect.equal (outgoing from graph)
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Just { data = from } |> Expect.equal (getData from graph)
@@ -185,10 +173,10 @@ graphTests =
               allDifferent [ from, to ] <|
                 let
                   graph =
-                    insertEdge ( from, to ) empty |> setTag 17
+                    insertEdge ( from, to ) empty
                 in
                   many
-                    [ Expect.notEqual graph (empty |> setTag 17)
+                    [ Expect.notEqual graph empty
                     , Set.singleton to |> Expect.equal (outgoing from graph)
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Nothing |> Expect.equal (getData from graph)
@@ -197,14 +185,13 @@ graphTests =
                     ]
         , fuzz (list (tuple ( int, int ))) "InsertEdge handles whatever you throw at it" <|
             \edgeList ->
-              List.foldl insertEdge (empty |> setTag 18) edgeList
+              List.foldl insertEdge empty edgeList
                 |> always Expect.pass
         ]
     , describe "member"
         [ fuzz int "Member check for members returns true" <|
             \key ->
               empty
-                |> setTag 19
                 |> insertNode key
                 |> member key
                 |> Expect.true "member should be present"
@@ -212,7 +199,6 @@ graphTests =
             \memberKey nonMemberKey ->
               allDifferent [ memberKey, nonMemberKey ] <|
                 (empty
-                  |> setTag 20
                   |> insertNode memberKey
                   |> member nonMemberKey
                   |> Expect.false "non-member should not be present"
@@ -220,7 +206,6 @@ graphTests =
         , fuzz int "Empty graph has no members" <|
             \key ->
               empty
-                |> setTag 21
                 |> member key
                 |> Expect.false "empty graph should not have any members"
         ]
@@ -228,7 +213,6 @@ graphTests =
         [ fuzz2 int int "Edge membership check for present edges returns true" <|
             \a b ->
               empty
-                |> setTag 22
                 |> insertEdge ( a, b )
                 |> memberEdge ( a, b )
                 |> Expect.true "edge should be present"
@@ -238,7 +222,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 23
                       |> insertEdge ( a, b )
                 in
                   many
@@ -265,7 +248,6 @@ graphTests =
         , fuzz int "Empty graph has no members" <|
             \key ->
               empty
-                |> setTag 24
                 |> member key
                 |> Expect.false "empty graph should not have any members"
         ]
@@ -276,7 +258,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 25
                       |> insertEdge ( e, a )
                       |> insertEdge ( a, b )
                       |> insertEdge ( c, b )
@@ -303,7 +284,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 26
                       |> insertEdge ( a, b )
                       |> insertEdge ( a, c )
                       |> insertEdge ( b, c )
@@ -330,7 +310,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 27
                       |> insertNodeData a { x = 1 }
                       |> insertNodeData b { x = 2 }
                       |> insertEdge ( a, b )
@@ -350,7 +329,6 @@ graphTests =
         , fuzz2 int int "Removing a node removes all edges to it" <|
             \a b ->
               empty
-                |> setTag 28
                 |> insertEdge ( a, b )
                 |> removeNode b
                 |> outgoing a
@@ -359,7 +337,6 @@ graphTests =
         , fuzz2 int int "Removing a node removes all edges from it" <|
             \a b ->
               empty
-                |> setTag 29
                 |> insertEdge ( a, b )
                 |> removeNode a
                 |> incoming b
@@ -368,16 +345,14 @@ graphTests =
         , test "Remove an edge between non-existant nodes is a no-op" <|
             \() ->
               empty
-                |> setTag 30
                 |> removeEdge ( 47, 11 )
-                |> Expect.equal (empty |> setTag 30)
+                |> Expect.equal empty
         , fuzz2 int int "Remove an edge with non-existant source node is a no-op" <|
             \a b ->
               allDifferent [ a, b ] <|
                 let
                   graph =
                     empty
-                      |> setTag 31
                       |> insertNode b
                 in
                   graph |> removeEdge ( a, b ) |> Expect.equal graph
@@ -387,7 +362,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 32
                       |> insertNode a
                 in
                   graph |> removeEdge ( a, b ) |> Expect.equal graph
@@ -437,7 +411,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 33
                       |> insertEdge ( a, b )
                       |> insertEdge ( a, c )
                       |> insertEdge ( b, d )
@@ -487,7 +460,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 34
                     |> insertNode 1
                     |> insertNode 2
               in
@@ -527,7 +499,6 @@ graphTests =
                 let
                   ( left, right ) =
                     empty
-                      |> setTag 35
                       |> insertEdge ( a, b )
                       |> partition (\key _ -> key == a)
                 in
@@ -549,7 +520,6 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> setTag 36
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
@@ -558,7 +528,6 @@ graphTests =
 
                   rightGraph =
                     empty
-                      |> setTag 36
                       |> insertNodeData d { x = d }
                       |> insertNodeData e { x = e }
                       |> insertEdge ( d, e )
@@ -578,7 +547,7 @@ graphTests =
                 in
                   many
                     [ left |> Expect.equal leftGraph
-                    , right |> Expect.equal (rightGraph |> setTag -36)
+                    , right |> Expect.equal rightGraph
                     , left |> getData a |> Expect.equal (Just { x = a })
                     , left |> getData b |> Expect.equal (Just { x = b })
                     , left |> getData c |> Expect.equal (Just { x = c })
@@ -594,7 +563,6 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> setTag 38
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
@@ -611,7 +579,7 @@ graphTests =
                 in
                   many
                     [ left |> Expect.equal graph
-                    , right |> Expect.equal (empty |> setTag -38)
+                    , right |> Expect.equal empty
                     , expectValid left
                     , expectValid right
                     ]
@@ -623,7 +591,6 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> setTag 40
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
@@ -632,7 +599,6 @@ graphTests =
 
                   rightGraph =
                     empty
-                      |> setTag 40
                       |> insertNodeData d { x = d }
                       |> insertNodeData e { x = e }
                       |> insertEdge ( d, e )
@@ -653,12 +619,10 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> setTag 41
                       |> insertNodeData a { x = a }
 
                   rightGraph =
                     empty
-                      |> setTag 41
                       |> insertNodeData b { x = b }
 
                   graph =
@@ -780,7 +744,6 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> setTag 43
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
@@ -805,7 +768,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 44
                     |> insertNode 1
                     |> insertNode 2
                     |> insertNode 3
@@ -817,7 +779,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 45
                     |> insertEdge ( 1, 2 )
                     |> insertEdge ( 1, 3 )
                     |> insertEdge ( 2, 4 )
@@ -829,7 +790,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 46
                     |> insertEdge ( 1, 2 )
                     |> insertEdge ( 1, 3 )
                     |> insertEdge ( 2, 4 )
@@ -842,7 +802,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 47
                     |> insertEdge ( 1, 2 )
                     |> insertEdge ( 1, 3 )
                     |> insertEdge ( 1, 4 )
@@ -862,7 +821,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 48
                     |> insertEdge ( 1, 2 )
                     |> insertEdge ( 2, 3 )
                     |> insertEdge ( 3, 1 )
@@ -876,7 +834,7 @@ graphTests =
             \g ->
               let
                 graph =
-                  g |> setTag 2001
+                  g
               in
                 case graph |> topologicalSort of
                   Nothing ->
@@ -889,7 +847,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 49
                     |> insertEdge ( 1, 2 )
                     |> insertEdge ( 2, 3 )
                     |> insertEdge ( 3, 1 )
@@ -905,7 +862,6 @@ graphTests =
               let
                 graph =
                   empty
-                    |> setTag 50
                     |> insertEdge ( 1, 1 )
               in
                 case graph |> topologicalSort of
@@ -919,20 +875,17 @@ graphTests =
         [ test "isAcyclic returns True for empty graph" <|
             \() ->
               empty
-                |> setTag 51
                 |> isAcyclic
                 |> Expect.true "empty graph should be acyclic"
         , test "isAcyclic returns True for single edge" <|
             \() ->
               empty
-                |> setTag 52
                 |> insertEdge ( 0, 1 )
                 |> isAcyclic
                 |> Expect.true "directed acyclic graph should be acyclic"
         , test "isAcyclic returns True for simple tree" <|
             \() ->
               empty
-                |> setTag 53
                 |> insertEdge ( 0, 1 )
                 |> insertEdge ( 0, 2 )
                 |> isAcyclic
@@ -940,52 +893,42 @@ graphTests =
         , fuzz acyclicGraphFuzzer "isAcyclic returns True for DAG's" <|
             \graph ->
               (graph
-                |> setTag 2002
                 |> isAcyclic
                 |> Expect.true "directed acyclic graph should be acyclic"
               )
         , fuzz acyclicGraphFuzzerWithSelfEdges "isAcyclic returns False for graphs with loops but no cycles" <|
-            \g ->
-              let
-                graph =
-                  g |> setTag 2006
-              in
-                if size graph == 0 then
-                  Expect.pass
-                else
-                  -- make sure there is at least one loop in the graph
-                  graph
-                    |> insertEdge ( -1, -1 )
-                    |> isAcyclic
-                    |> Expect.false "graph with loops is not acyclic"
+            \graph ->
+              if size graph == 0 then
+                Expect.pass
+              else
+                -- make sure there is at least one loop in the graph
+                graph
+                  |> insertEdge ( -1, -1 )
+                  |> isAcyclic
+                  |> Expect.false "graph with loops is not acyclic"
         , fuzz acyclicGraphFuzzerWithSelfEdges "isAcyclic returns False for graphs with cycles but no loops" <|
-            \g ->
-              let
-                graph =
-                  g |> setTag 2006
-              in
-                if size graph == 0 then
-                  Expect.pass
-                else
-                  graph
-                    -- remove loops
-                    |>
-                      edges
-                    |> List.filter (uncurry (==))
-                    |> List.foldl removeEdge graph
-                    -- make sure we have a cycle in the graph by adding negative edges
-                    |>
-                      insertEdge ( -1, -2 )
-                    |> insertEdge ( -2, -1 )
-                    |> isAcyclic
-                    |> Expect.false "graph with cycles is not acyclic"
+            \graph ->
+              if size graph == 0 then
+                Expect.pass
+              else
+                graph
+                  -- remove loops
+                  |>
+                    edges
+                  |> List.filter (uncurry (==))
+                  |> List.foldl removeEdge graph
+                  -- make sure we have a cycle in the graph by adding negative edges
+                  |>
+                    insertEdge ( -1, -2 )
+                  |> insertEdge ( -2, -1 )
+                  |> isAcyclic
+                  |> Expect.false "graph with cycles is not acyclic"
         ]
     , describe "reachable"
         [ fuzz2 int int "reachable finds direct child" <|
             \a b ->
               allDifferent [ a, b ] <|
                 (emptyDag
-                  |> setTag 101
                   |> insertEdge ( a, b )
                   |> reachable a
                   |> Expect.equal (Set.singleton b)
@@ -994,7 +937,6 @@ graphTests =
             \a b c ->
               allDifferent [ a, b, c ] <|
                 (emptyDag
-                  |> setTag 102
                   |> insertEdge ( a, b )
                   |> insertEdge ( b, c )
                   |> reachable a
@@ -1004,7 +946,6 @@ graphTests =
             \a b c d e ->
               allDifferent [ a, b, c, d, e ] <|
                 (emptyDag
-                  |> setTag 103
                   |> insertEdge ( a, b )
                   |> insertEdge ( b, c )
                   |> insertEdge ( c, d )
@@ -1016,7 +957,6 @@ graphTests =
             \a b c d e ->
               allDifferent [ a, b, c, d, e ] <|
                 (emptyDag
-                  |> setTag 104
                   |> insertEdge ( a, b )
                   |> insertEdge ( b, c )
                   |> insertEdge ( c, d )
@@ -1028,7 +968,7 @@ graphTests =
             \g ->
               let
                 graph =
-                  g |> setTag 2006
+                  g
               in
                 if size graph == 0 then
                   Expect.pass
@@ -1046,7 +986,6 @@ graphTests =
             \a b ->
               allDifferent [ a, b ] <|
                 (emptyDag
-                  |> setTag 105
                   |> insertEdge ( a, b )
                   |> relativeOrder a b
                   |> Expect.equal Before
@@ -1057,7 +996,6 @@ graphTests =
                 let
                   graph =
                     (emptyDag
-                      |> setTag 106
                       |> insertEdge ( a, b )
                       |> insertEdge ( b, c )
                     )
@@ -1077,7 +1015,6 @@ graphTests =
                 let
                   graph =
                     (emptyDag
-                      |> setTag 107
                       |> insertEdge ( a, b )
                       |> insertEdge ( b, c )
                       |> insertEdge ( b, d )
@@ -1122,7 +1059,6 @@ graphTests =
             \a b ->
               allDifferent [ a, b ] <|
                 (empty
-                  |> setTag 53
                   |> insertEdge ( a, b )
                   |> enableDagReachability
                   |> Maybe.map (relativeOrder a b)
@@ -1134,11 +1070,10 @@ graphTests =
                 let
                   graph =
                     (empty
-                      |> setTag 54
                       |> insertEdge ( a, b )
                       |> insertEdge ( b, c )
                       |> enableDagReachability
-                      |> Maybe.withDefault (empty |> setTag 1554)
+                      |> Maybe.withDefault empty
                     )
                 in
                   many
@@ -1156,14 +1091,13 @@ graphTests =
                 let
                   graph =
                     (empty
-                      |> setTag 55
                       |> insertEdge ( a, b )
                       |> insertEdge ( b, c )
                       |> insertEdge ( b, d )
                       |> insertEdge ( c, e )
                       |> insertEdge ( d, e )
                       |> enableDagReachability
-                      |> Maybe.withDefault (empty |> setTag 1555)
+                      |> Maybe.withDefault empty
                     )
                 in
                   many
@@ -1203,13 +1137,12 @@ graphTests =
                 let
                   graph =
                     (empty
-                      |> setTag 57
                       |> insertEdge ( a, b )
                       |> insertEdge ( b, c )
                       |> insertEdge ( b, d )
                       |> insertEdge ( c, e )
                       |> enableDagReachability
-                      |> Maybe.withDefault (empty |> setTag 1557)
+                      |> Maybe.withDefault empty
                       |> insertEdge ( d, e )
                     )
                 in

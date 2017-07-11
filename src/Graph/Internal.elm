@@ -2,7 +2,6 @@ module Graph.Internal
   exposing
     ( Graph
     , valid
-    , setTag
       -- query
     , getData
     , member
@@ -87,8 +86,7 @@ import Tuple
 -}
 type Graph comparable a
   = Graph
-      { id : Int
-      , nodes : Dict comparable (Node comparable a)
+      { nodes : Dict comparable (Node comparable a)
       , dagReachabilityState : FeatureState
       }
 
@@ -167,16 +165,11 @@ insert key node (Graph graph) =
 -- BUILD
 
 
-setTag : Int -> Graph comparable data -> Graph comparable data
-setTag tag (Graph graph) =
-  Graph { graph | id = tag }
-
-
 {-| Create an empty graph.
 -}
 empty : Graph comparable data
 empty =
-  Graph { nodes = Dict.empty, dagReachabilityState = Disabled, id = 0 }
+  Graph { nodes = Dict.empty, dagReachabilityState = Disabled }
 
 
 {-| Insert a node. Does not overwrite metadata if node already exists.
@@ -527,8 +520,8 @@ partition func (Graph graph) =
         ( left, Dict.insert key (Node node) right )
   in
     Dict.foldl add ( Dict.empty, Dict.empty ) graph.nodes
-      |> Tuple.mapFirst (\x -> Graph { dagReachabilityState = Disabled, nodes = x, id = graph.id })
-      |> Tuple.mapSecond (\x -> Graph { dagReachabilityState = Disabled, nodes = x, id = -graph.id })
+      |> Tuple.mapFirst (\x -> Graph { dagReachabilityState = Disabled, nodes = x })
+      |> Tuple.mapSecond (\x -> Graph { dagReachabilityState = Disabled, nodes = x })
       |> Tuple.mapFirst cleanup
       |> Tuple.mapSecond cleanup
 
@@ -557,7 +550,6 @@ union : Graph comparable data -> Graph comparable data -> Graph comparable data
 union (Graph a) (Graph b) =
   Graph
     { dagReachabilityState = Disabled
-    , id = a.id
     , nodes =
         Dict.merge
           (\key node dict -> Dict.insert key node dict)
@@ -586,7 +578,6 @@ intersect : Graph comparable data -> Graph comparable data -> Graph comparable d
 intersect (Graph a) (Graph b) =
   Graph
     { dagReachabilityState = Disabled
-    , id = a.id
     , nodes =
         Dict.merge
           (\key node dict -> dict)
@@ -674,40 +665,37 @@ reversePostOrderHelper nodeKeys keyOrder seenKeys graph =
 valid : Graph comparable data -> Result String ()
 valid (Graph graph) =
   -- Only validate if a tag is set; that means we're running our own unit tests.
-  if graph.id == 0 then
-    Ok ()
-  else
-    let
-      hasDanglingOutgoingEdges key =
-        (outgoing key (Graph graph)) |> Set.toList |> List.map (\key -> incoming key (Graph graph)) |> List.all (Set.member key) |> not
+  let
+    hasDanglingOutgoingEdges key =
+      (outgoing key (Graph graph)) |> Set.toList |> List.map (\key -> incoming key (Graph graph)) |> List.all (Set.member key) |> not
 
-      hasDanglingIncomingEdges key =
-        (incoming key (Graph graph)) |> Set.toList |> List.map (\key -> outgoing key (Graph graph)) |> List.all (Set.member key) |> not
+    hasDanglingIncomingEdges key =
+      (incoming key (Graph graph)) |> Set.toList |> List.map (\key -> outgoing key (Graph graph)) |> List.all (Set.member key) |> not
 
-      reachable : comparable -> Set comparable
-      reachable key =
-        (Graph graph)
-          |> get key
-          |> Maybe.map (\(Node node) -> node.reachable)
-          |> Maybe.withDefault Set.empty
+    reachable : comparable -> Set comparable
+    reachable key =
+      (Graph graph)
+        |> get key
+        |> Maybe.map (\(Node node) -> node.reachable)
+        |> Maybe.withDefault Set.empty
 
-      reachabilityCacheIsStale key =
-        (outgoing key (Graph graph) /= Set.empty)
-          && (reachable key
-                /= (List.foldl
-                      Set.union
-                      (outgoing key (Graph graph))
-                    <|
-                      List.map (\key -> reachable key) <|
-                        (Set.toList <| outgoing key (Graph graph))
-                   )
-             )
-    in
-      if keys (Graph graph) |> List.any hasDanglingOutgoingEdges then
-        Err (toString ( "found dangling outgoing edge", (Graph graph) ))
-      else if keys (Graph graph) |> List.any hasDanglingIncomingEdges then
-        Err (toString ( "found dangling incoming edge", (Graph graph) ))
-      else if (dagReachabilityState (Graph graph) == UpToDate) && (keys (Graph graph) |> List.any reachabilityCacheIsStale) then
-        Err (toString ( "reachability cache is not up to date", (Graph graph) ))
-      else
-        Ok ()
+    reachabilityCacheIsStale key =
+      (outgoing key (Graph graph) /= Set.empty)
+        && (reachable key
+              /= (List.foldl
+                    Set.union
+                    (outgoing key (Graph graph))
+                  <|
+                    List.map (\key -> reachable key) <|
+                      (Set.toList <| outgoing key (Graph graph))
+                 )
+           )
+  in
+    if keys (Graph graph) |> List.any hasDanglingOutgoingEdges then
+      Err (toString ( "found dangling outgoing edge", (Graph graph) ))
+    else if keys (Graph graph) |> List.any hasDanglingIncomingEdges then
+      Err (toString ( "found dangling incoming edge", (Graph graph) ))
+    else if (dagReachabilityState (Graph graph) == UpToDate) && (keys (Graph graph) |> List.any reachabilityCacheIsStale) then
+      Err (toString ( "reachability cache is not up to date", (Graph graph) ))
+    else
+      Ok ()
