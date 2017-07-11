@@ -12,6 +12,7 @@ module Graph
     , keys
     , nodes
     , edges
+    , edgesWithData
       -- build
     , empty
     , insertNode
@@ -52,7 +53,7 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs Graph
 
 # Query
-@docs getData, getEdgeData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, isAcyclic
+@docs getData, getEdgeData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, edgesWithData, isAcyclic
 
 # Build
 @docs empty, insertNode, insertNodeData, insertEdge, insertEdgeData, removeNode, removeNodeData, removeEdge, removeEdgeData, update, updateEdge
