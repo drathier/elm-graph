@@ -193,10 +193,6 @@ insertNodeData key data (Graph graph) =
         }
 
 
--- TODO: refactor using an "update if exists, otherwise insert and then update" function
--- that's what Graph.update does, if you default the input to a new node
-
-
 {-| Insert an edge between two nodes. Creates any nodes that do not already exist.
 
 If you want to pass the edge as a 2-tuple instead, you can use [`insertEdge`](Graph-Pair#insertEdge) from the [Pair](Graph-Pair) module.
