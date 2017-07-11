@@ -3,6 +3,7 @@ module Graph
     ( Graph
       -- query
     , getData
+    , getEdgeData
     , member
     , memberEdge
     , incoming
@@ -16,10 +17,14 @@ module Graph
     , insertNode
     , insertNodeData
     , insertEdge
+    , insertEdgeData
     , removeNode
+    , removeNodeData
     , removeEdge
+    , removeEdgeData
       -- transformation
     , map
+    , mapEdge
     , foldl
     , foldr
       -- set operations
@@ -45,13 +50,13 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs Graph
 
 # Query
-@docs getData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, isAcyclic
+@docs getData, getEdgeData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, isAcyclic
 
 # Build
-@docs empty, insertNode, insertNodeData, insertEdge, removeNode, removeEdge
+@docs empty, insertNode, insertNodeData, insertEdge, insertEdgeData, removeNode, removeNodeData, removeEdge, removeEdgeData
 
 # Transform
-@docs map, foldl, foldr
+@docs map, mapEdge, foldl, foldr
 
 # Combine
 @docs partition, union, intersect
@@ -62,6 +67,8 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 # Debugging tools
 @docs valid
 -}
+
+-- TODO: move pair functions to another module
 
 import Dict exposing (Dict)
 import List.Extra
@@ -99,7 +106,14 @@ type Node comparable data edgeData
 -}
 getData : comparable -> Graph comparable data edgeData -> Maybe data
 getData key graph =
-  get key graph |> Maybe.map (\(Node node) -> node.data) |> Maybe.Extra.join
+  get key graph |> Maybe.andThen (\(Node node) -> node.data)
+
+
+{-| Get the data associated with a specific edge.
+-}
+getEdgeData : comparable -> comparable -> Graph comparable data edgeData -> Maybe edgeData
+getEdgeData from to graph =
+  get from graph |> Maybe.andThen (\(Node node) -> node.outgoing |> Dict.get to) |> Maybe.Extra.join
 
 
 {-| Get the set of incoming edges to a node.
@@ -181,8 +195,20 @@ insertNodeData key data (Graph graph) =
 
 {-| Insert an edge between two nodes. Creates any nodes that do not already exist.
 -}
-insertEdge : ( comparable, comparable ) -> Graph comparable data edgeData -> Graph comparable data edgeData
-insertEdge ( from, to ) graph =
+insertEdge : comparable -> comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
+insertEdge from to graph =
+  insertEdgeDataHelper from to Nothing graph
+
+
+{-| Insert an edge with some metadata between two nodes. Creates any nodes that do not already exist.
+-}
+insertEdgeData : comparable -> comparable -> edgeData -> Graph comparable data edgeData -> Graph comparable data edgeData
+insertEdgeData from to edgeData graph =
+  insertEdgeDataHelper from to (Just edgeData) graph
+
+
+insertEdgeDataHelper : comparable -> comparable -> Maybe edgeData -> Graph comparable data edgeData -> Graph comparable data edgeData
+insertEdgeDataHelper from to wrappedEdgeData graph =
   let
     (Node fromNode) =
       getOrCreate from graph
@@ -197,13 +223,13 @@ insertEdge ( from, to ) graph =
             (Node
               { fromNode
                 | incoming = Set.insert from fromNode.incoming
-                , outgoing = Dict.insert from Nothing fromNode.outgoing
+                , outgoing = Dict.insert from wrappedEdgeData fromNode.outgoing
               }
             )
     else
       graph
         |> insert to (Node { toNode | incoming = Set.insert from toNode.incoming })
-        |> insert from (Node { fromNode | outgoing = Dict.insert to Nothing fromNode.outgoing })
+        |> insert from (Node { fromNode | outgoing = Dict.insert to wrappedEdgeData fromNode.outgoing })
 
 
 getOrCreate key graph =
@@ -229,7 +255,7 @@ removeNode key (Graph graph) =
         newGraph =
           Graph { graph | nodes = Dict.remove key graph.nodes }
       in
-        List.foldl removeEdge newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
+        List.foldl (uncurry removeEdge) newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
 
 
 -- TODO: figure out where we have to disable dagReachability, or recalculate it
@@ -237,8 +263,8 @@ removeNode key (Graph graph) =
 
 {-| Remove an edge identified by its source and target keys. No-op if source, target or edge doesn't exist.
 -}
-removeEdge : ( comparable, comparable ) -> Graph comparable data edgeData -> Graph comparable data edgeData
-removeEdge ( from, to ) graph =
+removeEdge : comparable -> comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
+removeEdge from to graph =
   let
     updateIncoming =
       \(Node node) -> Node { node | incoming = Set.remove from node.incoming }
@@ -249,6 +275,23 @@ removeEdge ( from, to ) graph =
     graph
       |> updateNode updateIncoming to
       |> updateNode updateOutgoing from
+
+
+{-| Remove the metadata associated with a specific node.
+-}
+removeNodeData : comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
+removeNodeData key (Graph graph) =
+  Graph
+    { graph
+      | nodes = graph.nodes |> Dict.update key (Maybe.map (\(Node node) -> Node { node | data = Nothing }))
+    }
+
+
+{-| Remove the metadata associated with a specific edge.
+-}
+removeEdgeData : comparable -> comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
+removeEdgeData from to graph =
+  graph |> removeEdge from to |> insertEdge from to
 
 
 -- QUERY
@@ -311,6 +354,24 @@ edges graph =
     graph
 
 
+{-| Get the (from, to, Maybe edgeData) pair for each edge in the graph.
+-}
+edgesWithData : Graph comparable data edgeData -> List ( comparable, comparable, Maybe edgeData )
+edgesWithData graph =
+  foldl
+    (\key _ list ->
+      (get key graph
+        |> Maybe.map (\(Node node) -> node.outgoing)
+        |> Maybe.withDefault Dict.empty
+        |> Dict.toList
+        |> List.map (\( out, edgeData ) -> ( key, out, edgeData ))
+      )
+        ++ list
+    )
+    []
+    graph
+
+
 {-| Determine if a graph contains any loops or cycles.
 -}
 isAcyclic : Graph comparable data edgeData -> Bool
@@ -359,6 +420,13 @@ map func (Graph graph) =
   Graph { graph | nodes = Dict.map (\key (Node node) -> Node { node | data = func key node.data }) graph.nodes }
 
 
+{-| Apply a function to the data associated with each edge in a graph.
+-}
+mapEdge : (comparable -> comparable -> Maybe edgeData1 -> Maybe edgeData2) -> Graph comparable data edgeData1 -> Graph comparable data edgeData2
+mapEdge func (Graph graph) =
+  Graph { graph | nodes = Dict.map (\from (Node node) -> Node { node | outgoing = Dict.map (func from) node.outgoing }) graph.nodes }
+
+
 {-| Fold over the node keys and data in a graph, in order from lowest key to highest key.
 -}
 foldl :
@@ -397,9 +465,6 @@ partition func (Graph graph) =
       |> Tuple.mapSecond (\x -> Graph { nodes = x })
       |> Tuple.mapFirst cleanup
       |> Tuple.mapSecond cleanup
-
-
--- TODO: what does cleanup do? remove edges?
 
 
 cleanup : Graph comparable data edgeData -> Graph comparable data edgeData
@@ -483,11 +548,6 @@ intersect (Graph a) (Graph b) =
 
 {-| Get a topological sorting of the graph, if the graph doesn't contain any loops or cycles.
 -}
-
-
--- TODO: toposort empty graph
-
-
 topologicalSort : Graph comparable data edgeData -> Maybe (List comparable)
 topologicalSort graph =
   let

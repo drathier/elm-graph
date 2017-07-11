@@ -8,6 +8,7 @@ import Expect
 import Fuzz exposing (list, int, tuple, string)
 import String
 import Graph exposing (..)
+import Graph.Pair as P
 import Set
 import GraphFuzzer exposing (acyclicGraphFuzzer, acyclicGraphFuzzerWithSelfEdges, graphFuzzer)
 import TestUtils exposing (allDifferent, checkPartialOrdering, many)
@@ -105,7 +106,7 @@ graphTests =
                 graph =
                   empty
                     |> insertNodeData key { data = key }
-                    |> insertEdge ( key, key )
+                    |> P.insertEdge ( key, key )
               in
                 many
                   [ Expect.notEqual graph empty
@@ -123,7 +124,7 @@ graphTests =
                     empty
                       |> insertNodeData from { data = from }
                       |> insertNodeData to { data = to }
-                      |> insertEdge ( from, to )
+                      |> P.insertEdge ( from, to )
                 in
                   many
                     [ Expect.notEqual graph empty
@@ -140,7 +141,7 @@ graphTests =
                   graph =
                     empty
                       |> insertNodeData to { data = to }
-                      |> insertEdge ( from, to )
+                      |> P.insertEdge ( from, to )
                 in
                   many
                     [ Expect.notEqual graph empty
@@ -157,7 +158,7 @@ graphTests =
                   graph =
                     empty
                       |> insertNodeData from { data = from }
-                      |> insertEdge ( from, to )
+                      |> P.insertEdge ( from, to )
                 in
                   many
                     [ Expect.notEqual graph empty
@@ -172,7 +173,7 @@ graphTests =
               allDifferent [ from, to ] <|
                 let
                   graph =
-                    insertEdge ( from, to ) empty
+                    P.insertEdge ( from, to ) empty
                 in
                   many
                     [ Expect.notEqual graph empty
@@ -184,7 +185,7 @@ graphTests =
                     ]
         , fuzz (list (tuple ( int, int ))) "InsertEdge handles whatever you throw at it" <|
             \edgeList ->
-              List.foldl insertEdge empty edgeList
+              List.foldl P.insertEdge empty edgeList
                 |> always Expect.pass
         ]
     , describe "member"
@@ -212,7 +213,7 @@ graphTests =
         [ fuzz2 int int "Edge membership check for present edges returns true" <|
             \a b ->
               empty
-                |> insertEdge ( a, b )
+                |> P.insertEdge ( a, b )
                 |> memberEdge ( a, b )
                 |> Expect.true "edge should be present"
         , fuzz3 int int int "Edge membership  check for non-present members returns false" <|
@@ -221,7 +222,7 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertEdge ( a, b )
+                      |> P.insertEdge ( a, b )
                 in
                   many
                     [ graph
@@ -257,15 +258,15 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertEdge ( e, a )
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( c, b )
-                      |> insertEdge ( e, b )
-                      |> insertEdge ( a, c )
-                      |> insertEdge ( b, c )
-                      |> insertEdge ( b, d )
-                      |> insertEdge ( c, e )
-                      |> insertEdge ( d, e )
+                      |> P.insertEdge ( e, a )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( c, b )
+                      |> P.insertEdge ( e, b )
+                      |> P.insertEdge ( a, c )
+                      |> P.insertEdge ( b, c )
+                      |> P.insertEdge ( b, d )
+                      |> P.insertEdge ( c, e )
+                      |> P.insertEdge ( d, e )
                 in
                   many
                     [ incoming a graph |> Expect.equal (Set.fromList [ e ])
@@ -283,15 +284,15 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( a, c )
-                      |> insertEdge ( b, c )
-                      |> insertEdge ( b, d )
-                      |> insertEdge ( c, b )
-                      |> insertEdge ( c, e )
-                      |> insertEdge ( d, e )
-                      |> insertEdge ( e, a )
-                      |> insertEdge ( e, b )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( a, c )
+                      |> P.insertEdge ( b, c )
+                      |> P.insertEdge ( b, d )
+                      |> P.insertEdge ( c, b )
+                      |> P.insertEdge ( c, e )
+                      |> P.insertEdge ( d, e )
+                      |> P.insertEdge ( e, a )
+                      |> P.insertEdge ( e, b )
                 in
                   many
                     [ outgoing a graph |> Expect.equal (Set.fromList [ b, c ])
@@ -311,11 +312,11 @@ graphTests =
                     empty
                       |> insertNodeData a { x = 1 }
                       |> insertNodeData b { x = 2 }
-                      |> insertEdge ( a, b )
+                      |> P.insertEdge ( a, b )
 
                   removed =
                     graph
-                      |> removeEdge ( a, b )
+                      |> P.removeEdge ( a, b )
                 in
                   many
                     [ graph |> Expect.notEqual removed
@@ -328,7 +329,7 @@ graphTests =
         , fuzz2 int int "Removing a node removes all edges to it" <|
             \a b ->
               empty
-                |> insertEdge ( a, b )
+                |> P.insertEdge ( a, b )
                 |> removeNode b
                 |> outgoing a
                 |> Set.member b
@@ -336,7 +337,7 @@ graphTests =
         , fuzz2 int int "Removing a node removes all edges from it" <|
             \a b ->
               empty
-                |> insertEdge ( a, b )
+                |> P.insertEdge ( a, b )
                 |> removeNode a
                 |> incoming b
                 |> Set.member a
@@ -344,7 +345,7 @@ graphTests =
         , test "Remove an edge between non-existant nodes is a no-op" <|
             \() ->
               empty
-                |> removeEdge ( 47, 11 )
+                |> P.removeEdge ( 47, 11 )
                 |> Expect.equal empty
         , fuzz2 int int "Remove an edge with non-existant source node is a no-op" <|
             \a b ->
@@ -354,7 +355,7 @@ graphTests =
                     empty
                       |> insertNode b
                 in
-                  graph |> removeEdge ( a, b ) |> Expect.equal graph
+                  graph |> P.removeEdge ( a, b ) |> Expect.equal graph
         , fuzz2 int int "Remove an edge with non-existant target node is a no-op" <|
             \a b ->
               allDifferent [ a, b ] <|
@@ -363,7 +364,7 @@ graphTests =
                     empty
                       |> insertNode a
                 in
-                  graph |> removeEdge ( a, b ) |> Expect.equal graph
+                  graph |> P.removeEdge ( a, b ) |> Expect.equal graph
         ]
     , describe "size"
         [ fuzz (list int) "Size equals the number of unique keys inserted " <|
@@ -397,7 +398,7 @@ graphTests =
                     [ ( a, b ), ( a, c ), ( b, c ), ( b, d ), ( c, b ), ( c, e ), ( d, e ), ( e, a ), ( e, b ) ]
 
                   graph =
-                    List.foldl insertEdge empty graphEdges
+                    List.foldl P.insertEdge empty graphEdges
                 in
                   edges graph
                     |> Set.fromList
@@ -410,12 +411,12 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( a, c )
-                      |> insertEdge ( b, d )
-                      |> insertEdge ( c, d )
-                      |> insertEdge ( d, e )
-                      |> insertEdge ( e, a )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( a, c )
+                      |> P.insertEdge ( b, d )
+                      |> P.insertEdge ( c, d )
+                      |> P.insertEdge ( d, e )
+                      |> P.insertEdge ( e, a )
                       |> insertNodeData a a
                       |> insertNodeData b b
                       |> insertNodeData e e
@@ -498,7 +499,7 @@ graphTests =
                 let
                   ( left, right ) =
                     empty
-                      |> insertEdge ( a, b )
+                      |> P.insertEdge ( a, b )
                       |> partition (\key _ -> key == a)
                 in
                   many
@@ -522,23 +523,23 @@ graphTests =
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( a, c )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( a, c )
 
                   rightGraph =
                     empty
                       |> insertNodeData d { x = d }
                       |> insertNodeData e { x = e }
-                      |> insertEdge ( d, e )
+                      |> P.insertEdge ( d, e )
 
                   graph =
                     rightGraph
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( a, c )
-                      |> insertEdge ( c, d )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( a, c )
+                      |> P.insertEdge ( c, d )
 
                   ( left, right ) =
                     graph
@@ -567,10 +568,10 @@ graphTests =
                       |> insertNodeData c { x = c }
                       |> insertNodeData d { x = d }
                       |> insertNodeData e { x = e }
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( a, c )
-                      |> insertEdge ( c, d )
-                      |> insertEdge ( d, e )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( a, c )
+                      |> P.insertEdge ( c, d )
+                      |> P.insertEdge ( d, e )
 
                   ( left, right ) =
                     graph
@@ -593,20 +594,20 @@ graphTests =
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( a, c )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( a, c )
 
                   rightGraph =
                     empty
                       |> insertNodeData d { x = d }
                       |> insertNodeData e { x = e }
-                      |> insertEdge ( d, e )
+                      |> P.insertEdge ( d, e )
 
                   graph =
                     leftGraph
                       |> insertNodeData d { x = d }
                       |> insertNodeData e { x = e }
-                      |> insertEdge ( d, e )
+                      |> P.insertEdge ( d, e )
 
                   graphUnion =
                     leftGraph |> union rightGraph
@@ -628,22 +629,22 @@ graphTests =
                     leftGraph
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
-                      |> insertEdge ( a, b )
+                      |> P.insertEdge ( a, b )
 
                   graphUnionLeft =
                     leftGraph
-                      |> insertEdge ( a, b )
+                      |> P.insertEdge ( a, b )
                       |> union rightGraph
 
                   graphUnionRight =
                     rightGraph
-                      |> insertEdge ( a, b )
+                      |> P.insertEdge ( a, b )
                       |> union leftGraph
 
                   graphUnionEdgeLast =
                     leftGraph
                       |> union rightGraph
-                      |> insertEdge ( a, b )
+                      |> P.insertEdge ( a, b )
 
                   nodesAnswer =
                     List.sortBy (\( a, _ ) -> a)
@@ -729,12 +730,12 @@ graphTests =
               allDifferent [ a, b, c ] <|
                 let
                   subgraph =
-                    empty |> insertEdge ( a, b )
+                    empty |> P.insertEdge ( a, b )
 
                   graph =
                     subgraph
                       |> insertNode c
-                      |> insertEdge ( b, c )
+                      |> P.insertEdge ( b, c )
                 in
                   intersect graph subgraph |> edges |> Expect.equal (edges subgraph)
         , fuzz5 int int int int int "intersection of larger graphs" <|
@@ -746,14 +747,14 @@ graphTests =
                       |> insertNodeData a { x = a }
                       |> insertNodeData b { x = b }
                       |> insertNodeData c { x = c }
-                      |> insertEdge ( a, b )
-                      |> insertEdge ( a, c )
+                      |> P.insertEdge ( a, b )
+                      |> P.insertEdge ( a, c )
 
                   graph =
                     leftGraph
                       |> insertNodeData d { x = d }
                       |> insertNodeData e { x = e }
-                      |> insertEdge ( d, e )
+                      |> P.insertEdge ( d, e )
                 in
                   many
                     [ graph |> intersect leftGraph |> Expect.equal leftGraph
@@ -778,10 +779,10 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertEdge ( 1, 2 )
-                    |> insertEdge ( 1, 3 )
-                    |> insertEdge ( 2, 4 )
-                    |> insertEdge ( 2, 5 )
+                    |> P.insertEdge ( 1, 2 )
+                    |> P.insertEdge ( 1, 3 )
+                    |> P.insertEdge ( 2, 4 )
+                    |> P.insertEdge ( 2, 5 )
               in
                 postOrder graph |> Expect.equal [ 4, 5, 2, 3, 1 ]
         , test "postOrder yields keys in post order for DAG's" <|
@@ -789,10 +790,10 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertEdge ( 1, 2 )
-                    |> insertEdge ( 1, 3 )
-                    |> insertEdge ( 2, 4 )
-                    |> insertEdge ( 3, 4 )
+                    |> P.insertEdge ( 1, 2 )
+                    |> P.insertEdge ( 1, 3 )
+                    |> P.insertEdge ( 2, 4 )
+                    |> P.insertEdge ( 3, 4 )
               in
                 -- this is not the only valid ordering, but it's the one our implementation gives.
                 postOrder graph |> Expect.equal [ 4, 2, 3, 1 ]
@@ -801,17 +802,17 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertEdge ( 1, 2 )
-                    |> insertEdge ( 1, 3 )
-                    |> insertEdge ( 1, 4 )
-                    |> insertEdge ( 2, 3 )
-                    |> insertEdge ( 2, 5 )
-                    |> insertEdge ( 3, 5 )
-                    |> insertEdge ( 6, 8 )
-                    |> insertEdge ( 7, 8 )
-                    |> insertEdge ( 5, 9 )
-                    |> insertEdge ( 8, 9 )
-                    |> insertEdge ( 9, 10 )
+                    |> P.insertEdge ( 1, 2 )
+                    |> P.insertEdge ( 1, 3 )
+                    |> P.insertEdge ( 1, 4 )
+                    |> P.insertEdge ( 2, 3 )
+                    |> P.insertEdge ( 2, 5 )
+                    |> P.insertEdge ( 3, 5 )
+                    |> P.insertEdge ( 6, 8 )
+                    |> P.insertEdge ( 7, 8 )
+                    |> P.insertEdge ( 5, 9 )
+                    |> P.insertEdge ( 8, 9 )
+                    |> P.insertEdge ( 9, 10 )
               in
                 -- this is not the only valid ordering, but it's the one our implementation gives.
                 postOrder graph |> Expect.equal [ 10, 9, 5, 3, 2, 4, 1, 8, 6, 7 ]
@@ -820,16 +821,18 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertEdge ( 1, 2 )
-                    |> insertEdge ( 2, 3 )
-                    |> insertEdge ( 3, 1 )
-                    |> insertEdge ( 3, 4 )
+                    |> P.insertEdge ( 1, 2 )
+                    |> P.insertEdge ( 2, 3 )
+                    |> P.insertEdge ( 3, 1 )
+                    |> P.insertEdge ( 3, 4 )
               in
                 -- this is far from the only possible answer, but 4 always comes before 3
                 postOrder graph |> Expect.equal [ 4, 3, 2, 1 ]
         ]
     , describe "topSort"
-        [ fuzz acyclicGraphFuzzer "topSort doesn't violate any partial orderings" <|
+        [ test "topSort handles empty graphs" <|
+            \() -> empty |> topologicalSort |> Expect.equal (Just [])
+        , fuzz acyclicGraphFuzzer "topSort doesn't violate any partial orderings" <|
             \g ->
               let
                 graph =
@@ -846,9 +849,9 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertEdge ( 1, 2 )
-                    |> insertEdge ( 2, 3 )
-                    |> insertEdge ( 3, 1 )
+                    |> P.insertEdge ( 1, 2 )
+                    |> P.insertEdge ( 2, 3 )
+                    |> P.insertEdge ( 3, 1 )
               in
                 case graph |> topologicalSort of
                   Nothing ->
@@ -861,7 +864,7 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertEdge ( 1, 1 )
+                    |> P.insertEdge ( 1, 1 )
               in
                 case graph |> topologicalSort of
                   Nothing ->
@@ -879,14 +882,14 @@ graphTests =
         , test "isAcyclic returns True for single edge" <|
             \() ->
               empty
-                |> insertEdge ( 0, 1 )
+                |> P.insertEdge ( 0, 1 )
                 |> isAcyclic
                 |> Expect.true "directed acyclic graph should be acyclic"
         , test "isAcyclic returns True for simple tree" <|
             \() ->
               empty
-                |> insertEdge ( 0, 1 )
-                |> insertEdge ( 0, 2 )
+                |> P.insertEdge ( 0, 1 )
+                |> P.insertEdge ( 0, 2 )
                 |> isAcyclic
                 |> Expect.true "directed acyclic graph should be acyclic"
         , fuzz acyclicGraphFuzzer "isAcyclic returns True for DAG's" <|
@@ -902,7 +905,7 @@ graphTests =
               else
                 -- make sure there is at least one loop in the graph
                 graph
-                  |> insertEdge ( -1, -1 )
+                  |> P.insertEdge ( -1, -1 )
                   |> isAcyclic
                   |> Expect.false "graph with loops is not acyclic"
         , fuzz acyclicGraphFuzzerWithSelfEdges "isAcyclic returns False for graphs with cycles but no loops" <|
@@ -915,11 +918,11 @@ graphTests =
                   |>
                     edges
                   |> List.filter (uncurry (==))
-                  |> List.foldl removeEdge graph
+                  |> List.foldl P.removeEdge graph
                   -- make sure we have a cycle in the graph by adding negative edges
                   |>
-                    insertEdge ( -1, -2 )
-                  |> insertEdge ( -2, -1 )
+                    P.insertEdge ( -1, -2 )
+                  |> P.insertEdge ( -2, -1 )
                   |> isAcyclic
                   |> Expect.false "graph with cycles is not acyclic"
         ]

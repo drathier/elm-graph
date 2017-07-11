@@ -5,6 +5,7 @@ import List.Extra
 import Random.Pcg exposing (..)
 import Fuzz exposing (Fuzzer)
 import Graph as G exposing (Graph, valid)
+import Graph.Pair as GP
 import Set
 import Shrink exposing (Shrinker)
 
@@ -34,7 +35,7 @@ graphShrinker : (Int -> Int -> Bool) -> Shrinker (Graph Int data edgeData)
 graphShrinker edgePredicate =
   let
     toGraph =
-      List.foldl G.insertEdge G.empty
+      List.foldl GP.insertEdge G.empty
 
     fromGraph =
       G.edges
@@ -64,7 +65,7 @@ graphGenerator edgeGenerator =
         (\keys ->
           map
             (\edges ->
-              List.foldl G.insertEdge G.empty edges
+              List.foldl GP.insertEdge G.empty edges
             )
             (edgeGenerator keys)
         )
