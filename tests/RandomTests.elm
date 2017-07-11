@@ -6,7 +6,7 @@ import Shrink
 import Test exposing (..)
 import Expect
 import Fuzz exposing (list, int, tuple, string)
-import Graph.Internal exposing (..)
+import Graph exposing (..)
 import Graph.Random exposing (topologicalSortFuzzer)
 import TestUtils exposing (checkPartialOrdering)
 

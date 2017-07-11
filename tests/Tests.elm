@@ -7,7 +7,7 @@ import Test exposing (..)
 import Expect
 import Fuzz exposing (list, int, tuple, string)
 import String
-import Graph.Internal exposing (..)
+import Graph exposing (..)
 import Set
 import GraphFuzzer exposing (acyclicGraphFuzzer, acyclicGraphFuzzerWithSelfEdges, graphFuzzer)
 import TestUtils exposing (allDifferent, checkPartialOrdering, many)

@@ -1,7 +1,7 @@
 module TestUtils exposing (..)
 
 import Expect
-import Graph.Internal exposing (..)
+import Graph exposing (..)
 import Test exposing (..)
 
 

@@ -4,7 +4,7 @@ import Dict exposing (Dict)
 import List.Extra
 import Random.Pcg exposing (..)
 import Fuzz exposing (Fuzzer)
-import Graph.Internal as G exposing (Graph, valid)
+import Graph as G exposing (Graph, valid)
 import Set
 import Shrink exposing (Shrinker)
 

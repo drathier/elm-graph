@@ -17,7 +17,7 @@ Graph.Random provides graph functions that require randomness to work. Note that
 -}
 
 import Fuzz
-import Graph.Internal exposing (Graph, isAcyclic, keys, outgoing)
+import Graph exposing (Graph, isAcyclic, keys, outgoing)
 import Random.List
 import Random.Pcg as Random
 import Set exposing (Set)
