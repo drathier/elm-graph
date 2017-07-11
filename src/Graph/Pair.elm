@@ -52,6 +52,13 @@ removeEdgeData =
   uncurry G.removeEdgeData
 
 
+{-| Uncurried version of [`updateEdge`](Graph#updateEdge).
+-}
+updateEdge : ( comparable, comparable ) -> (Maybe edgeData -> Maybe edgeData) -> Graph comparable data edgeData -> Graph comparable data edgeData
+updateEdge =
+  uncurry G.updateEdge
+
+
 {-| Uncurried version of [`mapEdge`](Graph#mapEdge).
 -}
 mapEdge : (( comparable, comparable ) -> Maybe edgeData1 -> Maybe edgeData2) -> Graph comparable data edgeData1 -> Graph comparable data edgeData2

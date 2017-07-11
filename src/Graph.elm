@@ -22,6 +22,8 @@ module Graph
     , removeNodeData
     , removeEdge
     , removeEdgeData
+    , update
+    , updateEdge
       -- transformation
     , map
     , mapEdge
@@ -53,7 +55,7 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs getData, getEdgeData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, isAcyclic
 
 # Build
-@docs empty, insertNode, insertNodeData, insertEdge, insertEdgeData, removeNode, removeNodeData, removeEdge, removeEdgeData
+@docs empty, insertNode, insertNodeData, insertEdge, insertEdgeData, removeNode, removeNodeData, removeEdge, removeEdgeData, update, updateEdge
 
 # Transform
 @docs map, mapEdge, foldl, foldr
@@ -302,6 +304,22 @@ If you want to pass the edge as a 2-tuple instead, you can use [`removeEdgeData`
 removeEdgeData : comparable -> comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
 removeEdgeData from to graph =
   graph |> removeEdge from to |> insertEdge from to
+
+
+{-| Update the metadata associated with a specific node.
+-}
+update : comparable -> (Maybe data -> Maybe data) -> Graph comparable data edgeData -> Graph comparable data edgeData
+update key fn graph =
+  getData key graph |> fn |> Maybe.map (\data -> insertNodeData key data graph) |> Maybe.withDefault graph
+
+
+{-| Update the metadata associated with a specific edge.
+
+If you want to pass the edge as a 2-tuple instead, you can use [`updateEdge`](Graph-Pair#updateEdge) from the [Pair](Graph-Pair) module.
+-}
+updateEdge : comparable -> comparable -> (Maybe edgeData -> Maybe edgeData) -> Graph comparable data edgeData -> Graph comparable data edgeData
+updateEdge from to fn graph =
+  getEdgeData from to graph |> fn |> Maybe.map (\edgeData -> insertEdgeData from to edgeData graph) |> Maybe.withDefault graph
 
 
 -- QUERY
