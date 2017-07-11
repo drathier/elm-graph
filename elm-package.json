@@ -9,6 +9,7 @@
     ],
     "exposed-modules": [
         "Graph",
+        "Graph.Pair",
         "Graph.Random"
     ],
     "dependencies": {

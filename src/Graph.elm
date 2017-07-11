@@ -84,7 +84,7 @@ import Tuple
 -}
 
 
-{-| A directed graph. `(Graph Int String) is a graph that uses `Int`s for identifying its nodes, and lets you store a `String` on each node.
+{-| A directed graph. `(Graph Int String Float)` is a graph that uses `Int`s for identifying its nodes, and lets you store a `String` on each node and a `Float` on each edge.
 -}
 type Graph comparable data edgeData
   = Graph { nodes : Dict comparable (Node comparable data edgeData) }
@@ -110,6 +110,8 @@ getData key graph =
 
 
 {-| Get the data associated with a specific edge.
+
+If you want to pass the edge as a 2-tuple instead, you can use [`getEdgeData`](Graph-Pair#getEdgeData) from the [Pair](Graph-Pair) module.
 -}
 getEdgeData : comparable -> comparable -> Graph comparable data edgeData -> Maybe edgeData
 getEdgeData from to graph =
@@ -194,6 +196,8 @@ insertNodeData key data (Graph graph) =
 
 
 {-| Insert an edge between two nodes. Creates any nodes that do not already exist.
+
+If you want to pass the edge as a 2-tuple instead, you can use [`insertEdge`](Graph-Pair#insertEdge) from the [Pair](Graph-Pair) module.
 -}
 insertEdge : comparable -> comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
 insertEdge from to graph =
@@ -201,6 +205,8 @@ insertEdge from to graph =
 
 
 {-| Insert an edge with some metadata between two nodes. Creates any nodes that do not already exist.
+
+If you want to pass the edge as a 2-tuple instead, you can use [`insertEdgeData`](Graph-Pair#insertEdgeData) from the [Pair](Graph-Pair) module.
 -}
 insertEdgeData : comparable -> comparable -> edgeData -> Graph comparable data edgeData -> Graph comparable data edgeData
 insertEdgeData from to edgeData graph =
@@ -262,6 +268,8 @@ removeNode key (Graph graph) =
 
 
 {-| Remove an edge identified by its source and target keys. No-op if source, target or edge doesn't exist.
+
+If you want to pass the edge as a 2-tuple instead, you can use [`removeEdge`](Graph-Pair#removeEdge) from the [Pair](Graph-Pair) module.
 -}
 removeEdge : comparable -> comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
 removeEdge from to graph =
@@ -288,6 +296,8 @@ removeNodeData key (Graph graph) =
 
 
 {-| Remove the metadata associated with a specific edge.
+
+If you want to pass the edge as a 2-tuple instead, you can use [`removeEdgeData`](Graph-Pair#removeEdgeData) from the [Pair](Graph-Pair) module.
 -}
 removeEdgeData : comparable -> comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
 removeEdgeData from to graph =
@@ -421,6 +431,8 @@ map func (Graph graph) =
 
 
 {-| Apply a function to the data associated with each edge in a graph.
+
+If you want to pass the edge as a 2-tuple instead, you can use [`mapEdge`](Graph-Pair#mapEdge) from the [Pair](Graph-Pair) module.
 -}
 mapEdge : (comparable -> comparable -> Maybe edgeData1 -> Maybe edgeData2) -> Graph comparable data edgeData1 -> Graph comparable data edgeData2
 mapEdge func (Graph graph) =
