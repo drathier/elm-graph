@@ -12,17 +12,17 @@ import Shrink exposing (Shrinker)
 -- Fuzzing
 
 
-acyclicGraphFuzzer : Fuzzer (Graph Int data)
+acyclicGraphFuzzer : Fuzzer (Graph Int data edgeData)
 acyclicGraphFuzzer =
   Fuzz.custom (graphGenerator (edgeGenerator (<))) (graphShrinker (<))
 
 
-acyclicGraphFuzzerWithSelfEdges : Fuzzer (Graph Int data)
+acyclicGraphFuzzerWithSelfEdges : Fuzzer (Graph Int data edgeData)
 acyclicGraphFuzzerWithSelfEdges =
   Fuzz.custom (graphGenerator (edgeGenerator (<=))) (graphShrinker (<=))
 
 
-graphFuzzer : Fuzzer (Graph Int data)
+graphFuzzer : Fuzzer (Graph Int data edgeData)
 graphFuzzer =
   Fuzz.custom (graphGenerator (edgeGenerator (\_ _ -> True))) (graphShrinker (\_ _ -> True))
 
@@ -30,7 +30,7 @@ graphFuzzer =
 -- Shrinking
 
 
-graphShrinker : (Int -> Int -> Bool) -> Shrinker (Graph Int data)
+graphShrinker : (Int -> Int -> Bool) -> Shrinker (Graph Int data edgeData)
 graphShrinker edgePredicate =
   let
     toGraph =
@@ -54,7 +54,7 @@ graphShrinker edgePredicate =
 
 graphGenerator :
   (List Int -> Generator (List ( Int, Int )))
-  -> Generator (Graph Int data)
+  -> Generator (Graph Int data edgeData)
 graphGenerator edgeGenerator =
   -- NOTE: the 0, 100 range is hard coded in multiple places in this file
   int 0 20

@@ -21,7 +21,7 @@ all =
     ]
 
 
-expectValid : Graph comparable data -> Expect.Expectation
+expectValid : Graph comparable data edgeData -> Expect.Expectation
 expectValid graph =
   case valid graph of
     Ok () ->

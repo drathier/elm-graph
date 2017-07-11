@@ -26,7 +26,7 @@ import Shrink
 
 {-| Elm-test fuzzer that generates random topological sortings of a *directed acyclic graph*. Crashes if the graph contains cycles.
 -}
-topologicalSortFuzzer : Graph comparable data -> Fuzz.Fuzzer (List comparable)
+topologicalSortFuzzer : Graph comparable data edgeData -> Fuzz.Fuzzer (List comparable)
 topologicalSortFuzzer graph =
   if isAcyclic graph then
     Fuzz.custom (randomTopologicalSort graph) topologicalSortShrinker
@@ -36,7 +36,7 @@ topologicalSortFuzzer graph =
 
 {-| Generate a random topological sorting of a *directed acyclic graph*. Crashes if the graph contains cycles.
 -}
-randomTopologicalSort : Graph comparable data -> Random.Generator (List comparable)
+randomTopologicalSort : Graph comparable data edgeData -> Random.Generator (List comparable)
 randomTopologicalSort graph =
   if isAcyclic graph then
     (keys graph |> Random.List.shuffle)
@@ -46,7 +46,7 @@ randomTopologicalSort graph =
     Debug.crash "Graph.Random topologicalSortFuzzer got cyclic graph as argument"
 
 
-randomReversePostOrderHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data -> Random.Generator ( Set comparable, List comparable )
+randomReversePostOrderHelper : List comparable -> List comparable -> Set comparable -> Graph comparable data edgeData -> Random.Generator ( Set comparable, List comparable )
 randomReversePostOrderHelper nodeKeys keyOrder seenKeys graph =
   case nodeKeys of
     [] ->
