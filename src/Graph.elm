@@ -70,8 +70,6 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs valid
 -}
 
--- TODO: move pair functions to another module
-
 import Dict exposing (Dict)
 import List.Extra
 import Maybe.Extra
@@ -195,6 +193,7 @@ insertNodeData key data (Graph graph) =
 
 
 -- TODO: refactor using an "update if exists, otherwise insert and then update" function
+-- that's what Graph.update does, if you default the input to a new node
 
 
 {-| Insert an edge between two nodes. Creates any nodes that do not already exist.
@@ -264,9 +263,6 @@ removeNode key (Graph graph) =
           Graph { graph | nodes = Dict.remove key graph.nodes }
       in
         List.foldl (uncurry removeEdge) newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
-
-
--- TODO: figure out where we have to disable dagReachability, or recalculate it
 
 
 {-| Remove an edge identified by its source and target keys. No-op if source, target or edge doesn't exist.

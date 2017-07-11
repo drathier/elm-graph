@@ -44,7 +44,7 @@ graphShrinker edgePredicate =
       (Shrink.keepIf (\i -> low <= i && i <= high) Shrink.int)
   in
     -- NOTE: only handles edges; nothing else
-    Shrink.tuple ( intRange 0 100, intRange 0 100 )
+    Shrink.tuple ( intRange 0 20, intRange 0 20 )
       |> Shrink.keepIf (uncurry edgePredicate)
       |> Shrink.list
       |> Shrink.convert toGraph fromGraph
@@ -57,9 +57,9 @@ graphGenerator :
   (List Int -> Generator (List ( Int, Int )))
   -> Generator (Graph Int data edgeData)
 graphGenerator edgeGenerator =
-  -- NOTE: the 0, 100 range is hard coded in multiple places in this file
+  -- NOTE: the 0, 20 range is hard coded in multiple places in this file
   int 0 20
-    |> andThen (\n -> list n (int 0 100))
+    |> andThen (\n -> list n (int 0 20))
     |> map List.Extra.unique
     |> andThen
         (\keys ->
