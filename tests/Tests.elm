@@ -22,6 +22,16 @@ all =
     ]
 
 
+expectValid : Graph comparable data -> Expect.Expectation
+expectValid graph =
+  case valid graph of
+    Ok () ->
+      Expect.pass
+
+    Err msg ->
+      Expect.fail msg
+
+
 graphTests =
   describe "Graph tests"
     [ describe "insertNode"
@@ -113,6 +123,7 @@ graphTests =
                   , Set.singleton key |> Expect.equal (incoming key graph)
                   , Just { data = key } |> Expect.equal (getData key graph)
                   , Just { data = key } |> Expect.equal (getData key graph)
+                  , expectValid graph
                   ]
         , fuzz2 int int "Insert an edge between two existing nodes" <|
             \from to ->
@@ -131,6 +142,7 @@ graphTests =
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Just { data = from } |> Expect.equal (getData from graph)
                     , Just { data = to } |> Expect.equal (getData to graph)
+                    , expectValid graph
                     ]
         , fuzz2 int int "Insert an edge with non-existant source node" <|
             \from to ->
@@ -148,6 +160,7 @@ graphTests =
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Nothing |> Expect.equal (getData from graph)
                     , Just { data = to } |> Expect.equal (getData to graph)
+                    , expectValid graph
                     ]
         , fuzz2 int int "Insert an edge with non-existant target node" <|
             \from to ->
@@ -165,6 +178,7 @@ graphTests =
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Just { data = from } |> Expect.equal (getData from graph)
                     , Nothing |> Expect.equal (getData to graph)
+                    , expectValid graph
                     ]
         , fuzz2 int int "Insert an edge between two non-existant nodes" <|
             \from to ->
@@ -179,11 +193,11 @@ graphTests =
                     , Set.singleton from |> Expect.equal (incoming to graph)
                     , Nothing |> Expect.equal (getData from graph)
                     , Nothing |> Expect.equal (getData to graph)
+                    , expectValid graph
                     ]
         , fuzz (list (tuple ( int, int ))) "InsertEdge handles whatever you throw at it" <|
             \edgeList ->
               List.foldl insertEdge (empty |> setTag 18) edgeList
-                |> validate (Debug.crash)
                 |> always Expect.pass
         ]
     , describe "member"
@@ -246,6 +260,7 @@ graphTests =
                     , graph
                         |> memberEdge ( nonMember, b )
                         |> Expect.false "Edge ( nonMember -> b ) shouldn't be present"
+                    , expectValid graph
                     ]
         , fuzz int "Empty graph has no members" <|
             \key ->
@@ -278,6 +293,7 @@ graphTests =
                     , incoming c graph |> Expect.equal (Set.fromList [ a, b ])
                     , incoming d graph |> Expect.equal (Set.fromList [ b ])
                     , incoming e graph |> Expect.equal (Set.fromList [ c, d ])
+                    , expectValid graph
                     ]
         ]
     , describe "outgoing"
@@ -304,6 +320,7 @@ graphTests =
                     , outgoing c graph |> Expect.equal (Set.fromList [ b, e ])
                     , outgoing d graph |> Expect.equal (Set.fromList [ e ])
                     , outgoing e graph |> Expect.equal (Set.fromList [ a, b ])
+                    , expectValid graph
                     ]
         ]
     , describe "removeEdge"
@@ -328,6 +345,7 @@ graphTests =
                     , removed |> getData b |> Expect.equal (Just { x = 2 })
                     , removed |> memberEdge ( a, b ) |> Expect.false "shouldn't have an edge from a to b"
                     , removed |> memberEdge ( b, a ) |> Expect.false "shouldn't have an edge from b to a"
+                    , expectValid graph
                     ]
         , fuzz2 int int "Removing a node removes all edges to it" <|
             \a b ->
@@ -429,7 +447,6 @@ graphTests =
                       |> insertNodeData a a
                       |> insertNodeData b b
                       |> insertNodeData e e
-                      |> validate Debug.crash
 
                   nodesBefore =
                     nodes graph
@@ -523,6 +540,8 @@ graphTests =
                     , right |> incoming a |> Expect.equal Set.empty
                     , right |> outgoing a |> Expect.equal Set.empty
                     , right |> edges |> List.map Tuple.first |> Expect.equal []
+                    , expectValid left
+                    , expectValid right
                     ]
         , fuzz5 int int int int int "partition preserves all data on edges" <|
             \a b c d e ->
@@ -565,6 +584,9 @@ graphTests =
                     , left |> getData c |> Expect.equal (Just { x = c })
                     , right |> getData d |> Expect.equal (Just { x = d })
                     , right |> getData e |> Expect.equal (Just { x = e })
+                    , expectValid leftGraph
+                    , expectValid rightGraph
+                    , expectValid graph
                     ]
         , fuzz5 int int int int int "partition by always returning true yields a graph equal to input" <|
             \a b c d e ->
@@ -590,6 +612,8 @@ graphTests =
                   many
                     [ left |> Expect.equal graph
                     , right |> Expect.equal (empty |> setTag -38)
+                    , expectValid left
+                    , expectValid right
                     ]
         ]
     , describe "union"
@@ -680,6 +704,12 @@ graphTests =
                         |> nodes
                         |> List.sortBy (\( a, _ ) -> a)
                         |> Expect.equal nodesAnswer
+                    , expectValid leftGraph
+                    , expectValid rightGraph
+                    , expectValid graph
+                    , expectValid graphUnionLeft
+                    , expectValid graphUnionRight
+                    , expectValid graphUnionEdgeLast
                     ]
         , fuzz2 int int "union prefers metadata from left graph" <|
             \a b ->
@@ -763,7 +793,11 @@ graphTests =
                       |> insertNodeData e { x = e }
                       |> insertEdge ( d, e )
                 in
-                  graph |> intersect leftGraph |> Expect.equal leftGraph
+                  many
+                    [ graph |> intersect leftGraph |> Expect.equal leftGraph
+                    , expectValid graph
+                    , expectValid leftGraph
+                    ]
         ]
     , describe "postOrder"
         [ test "postOrder handles edgeless graphs" <|
@@ -844,7 +878,7 @@ graphTests =
                 graph =
                   g |> setTag 2001
               in
-                case graph |> validate Debug.crash |> topologicalSort of
+                case graph |> topologicalSort of
                   Nothing ->
                     Expect.fail "Failed to generate a valid topological sort; is input acyclic?"
 
@@ -1035,6 +1069,7 @@ graphTests =
                     , Expect.equal (graph |> relativeOrder b c) Before
                     , Expect.equal (graph |> relativeOrder c a) After
                     , Expect.equal (graph |> relativeOrder c b) After
+                    , expectValid graph
                     ]
         , fuzz5 int int int int int "relativeOrder handles small directed acyclic graphs" <|
             \a b c d e ->
@@ -1079,6 +1114,7 @@ graphTests =
                     , Expect.equal (graph |> relativeOrder e b) After
                     , Expect.equal (graph |> relativeOrder e c) After
                     , Expect.equal (graph |> relativeOrder e d) After
+                    , expectValid graph
                     ]
         ]
     , describe "relativeOrder with feature enabled after construction"
@@ -1112,6 +1148,7 @@ graphTests =
                     , Expect.equal (graph |> relativeOrder b c) Before
                     , Expect.equal (graph |> relativeOrder c a) After
                     , Expect.equal (graph |> relativeOrder c b) After
+                    , expectValid graph
                     ]
         , fuzz5 int int int int int "relativeOrder handles small directed acyclic graphs" <|
             \a b c d e ->
@@ -1158,6 +1195,7 @@ graphTests =
                     , Expect.equal (graph |> relativeOrder e b) After
                     , Expect.equal (graph |> relativeOrder e c) After
                     , Expect.equal (graph |> relativeOrder e d) After
+                    , expectValid graph
                     ]
         , fuzz5 int int int int int "relativeOrder handles small directed acyclic graphs, feature enabled mid-construction" <|
             \a b c d e ->
@@ -1204,6 +1242,7 @@ graphTests =
                     , Expect.equal (graph |> relativeOrder e b) After
                     , Expect.equal (graph |> relativeOrder e c) After
                     , Expect.equal (graph |> relativeOrder e d) After
+                    , expectValid graph
                     ]
         ]
     ]

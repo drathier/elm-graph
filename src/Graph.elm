@@ -104,6 +104,7 @@ import Graph.Internal as I
     , topologicalSort
     , postOrder
     , isAcyclic
+      -- debugging
     )
 import Graph.RelativeOrdering exposing (RelativeOrdering)
 import Set exposing (Set)

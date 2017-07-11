@@ -1,7 +1,7 @@
 module Graph.Internal
   exposing
     ( Graph
-    , validate
+    , valid
     , setTag
       -- query
     , getData
@@ -64,6 +64,8 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 # Algorithms and Traversal
 @docs postOrder, topologicalSort
 
+# Debugging tools
+@docs valid
 -}
 
 import Dict exposing (Dict)
@@ -182,7 +184,6 @@ empty =
 insertNode : comparable -> Graph comparable data -> Graph comparable data
 insertNode key graph =
   insert key (getOrCreate key graph) graph
-    |> validate (Debug.crash)
 
 
 {-| Update metadata for a node. Creates the node if it does not already exist.
@@ -198,7 +199,6 @@ insertNodeData key data (Graph graph) =
                 (Node { node | data = Just data })
                 graph.nodes
         }
-        |> validate (Debug.crash)
 
 
 -- TODO: refactor using an "update if exists, otherwise insert and then update" function
@@ -257,7 +257,6 @@ removeNode key (Graph graph) =
       in
         List.foldl removeEdge newGraph (incomingEdgesToRemove ++ outgoingEdgesToRemove)
           |> disableDagReachability
-          |> validate (Debug.crash)
 
 
 -- TODO: figure out where we have to disable dagReachability, or recalculate it
@@ -278,7 +277,6 @@ removeEdge ( from, to ) graph =
       |> updateNode updateIncoming to
       |> updateNode updateOutgoing from
       |> disableDagReachability
-      |> validate (Debug.crash)
 
 
 -- DYNAMIC FEATURES
@@ -304,7 +302,6 @@ enableDagReachability (Graph graph) =
   else
     Graph { graph | dagReachabilityState = UpToDate }
       |> updateReachability
-      |> Maybe.map (validate Debug.crash)
 
 
 {-| Disable the dynamic reachability optimization for *directed acyclic graphs*.
@@ -312,7 +309,6 @@ enableDagReachability (Graph graph) =
 disableDagReachability : Graph comparable data -> Graph comparable data
 disableDagReachability (Graph graph) =
   Graph { graph | dagReachabilityState = Disabled }
-    |> validate (Debug.crash)
 
 
 dagReachabilityState : Graph comparable data -> FeatureState
@@ -324,7 +320,6 @@ updateReachability : Graph comparable data -> Maybe (Graph comparable data)
 updateReachability graph =
   topologicalSort graph
     |> Maybe.map (List.foldl updateReachabilityFrom graph)
-    |> Maybe.map (validate Debug.crash)
 
 
 updateReachabilityFrom : comparable -> Graph comparable data -> Graph comparable data
@@ -469,7 +464,7 @@ reachable key graph =
 -}
 relativeOrder : comparable -> comparable -> Graph comparable data -> RelativeOrdering
 relativeOrder a b graph =
-  if graph |> validate (Debug.crash) |> reachable a |> Set.member b then
+  if graph |> reachable a |> Set.member b then
     Before
   else if graph |> reachable b |> Set.member a then
     After
@@ -536,8 +531,6 @@ partition func (Graph graph) =
       |> Tuple.mapSecond (\x -> Graph { dagReachabilityState = Disabled, nodes = x, id = -graph.id })
       |> Tuple.mapFirst cleanup
       |> Tuple.mapSecond cleanup
-      |> Tuple.mapFirst (validate Debug.crash)
-      |> Tuple.mapSecond (validate Debug.crash)
 
 
 cleanup : Graph comparable data -> Graph comparable data
@@ -585,7 +578,6 @@ union (Graph a) (Graph b) =
           Dict.empty
     }
     |> cleanup
-    |> validate (Debug.crash)
 
 
 {-| Create a graph based on the intersection of two graphs. If both graphs have the same node, edge or associated metadata, it will be in the resulting graph.
@@ -619,7 +611,6 @@ intersect (Graph a) (Graph b) =
           Dict.empty
     }
     |> cleanup
-    |> validate (Debug.crash)
 
 
 -- TRAVERSAL
@@ -680,11 +671,11 @@ reversePostOrderHelper nodeKeys keyOrder seenKeys graph =
 
 {-| Validate checks that all invariants in the graph are correct. Useful for debugging.
 -}
-validate : (String -> Graph comparable data) -> Graph comparable data -> Graph comparable data
-validate crash (Graph graph) =
+valid : Graph comparable data -> Result String ()
+valid (Graph graph) =
   -- Only validate if a tag is set; that means we're running our own unit tests.
   if graph.id == 0 then
-    Graph graph
+    Ok ()
   else
     let
       hasDanglingOutgoingEdges key =
@@ -713,10 +704,10 @@ validate crash (Graph graph) =
              )
     in
       if keys (Graph graph) |> List.any hasDanglingOutgoingEdges then
-        crash (toString ( "found dangling outgoing edge", (Graph graph) ))
+        Err (toString ( "found dangling outgoing edge", (Graph graph) ))
       else if keys (Graph graph) |> List.any hasDanglingIncomingEdges then
-        crash (toString ( "found dangling incoming edge", (Graph graph) ))
+        Err (toString ( "found dangling incoming edge", (Graph graph) ))
       else if (dagReachabilityState (Graph graph) == UpToDate) && (keys (Graph graph) |> List.any reachabilityCacheIsStale) then
-        crash (toString ( "reachability cache is not up to date", (Graph graph) ))
+        Err (toString ( "reachability cache is not up to date", (Graph graph) ))
       else
-        (Graph graph)
+        Ok ()

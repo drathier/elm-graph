@@ -4,7 +4,7 @@ import Dict exposing (Dict)
 import List.Extra
 import Random.Pcg exposing (..)
 import Fuzz exposing (Fuzzer)
-import Graph.Internal as G exposing (Graph, empty, setTag, validate)
+import Graph.Internal as G exposing (Graph, empty, setTag, valid)
 import Set
 import Shrink exposing (Shrinker)
 
@@ -78,7 +78,6 @@ graphGenerator empty edgeGenerator =
             )
             (edgeGenerator keys)
         )
-    |> map (validate Debug.crash)
 
 
 edgeGenerator : (Int -> Int -> Bool) -> List Int -> Generator (List ( Int, Int ))
