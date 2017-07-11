@@ -8,6 +8,7 @@ module Graph
     , memberEdge
     , incoming
     , outgoing
+    , isEmpty
     , size
     , keys
     , nodes
@@ -15,12 +16,12 @@ module Graph
     , edgesWithData
       -- build
     , empty
-    , insertNode
-    , insertNodeData
+    , insert
+    , insertData
     , insertEdge
     , insertEdgeData
-    , removeNode
-    , removeNodeData
+    , remove
+    , removeData
     , removeEdge
     , removeEdgeData
     , update
@@ -53,10 +54,10 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs Graph
 
 # Query
-@docs getData, getEdgeData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, edgesWithData, isAcyclic
+@docs getData, getEdgeData, member, memberEdge, incoming, outgoing, isEmpty, size, keys, nodes, edges, edgesWithData, isAcyclic
 
 # Build
-@docs empty, insertNode, insertNodeData, insertEdge, insertEdgeData, removeNode, removeNodeData, removeEdge, removeEdgeData, update, updateEdge
+@docs empty, insert, insertData, insertEdge, insertEdgeData, remove, removeData, removeEdge, removeEdgeData, update, updateEdge
 
 # Transform
 @docs map, mapEdge, foldl, foldr
@@ -156,8 +157,8 @@ nodeData data =
     }
 
 
-insert : comparable -> Node comparable data edgeData -> Graph comparable data edgeData -> Graph comparable data edgeData
-insert key node (Graph graph) =
+insertRawNode : comparable -> Node comparable data edgeData -> Graph comparable data edgeData -> Graph comparable data edgeData
+insertRawNode key node (Graph graph) =
   Graph { graph | nodes = Dict.insert key node graph.nodes }
 
 
@@ -173,15 +174,15 @@ empty =
 
 {-| Insert a node. Does not overwrite metadata if node already exists.
 -}
-insertNode : comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
-insertNode key graph =
-  insert key (getOrCreate key graph) graph
+insert : comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
+insert key graph =
+  insertRawNode key (getOrCreate key graph) graph
 
 
 {-| Update metadata for a node. Creates the node if it does not already exist.
 -}
-insertNodeData : comparable -> data -> Graph comparable data edgeData -> Graph comparable data edgeData
-insertNodeData key data (Graph graph) =
+insertData : comparable -> data -> Graph comparable data edgeData -> Graph comparable data edgeData
+insertData key data (Graph graph) =
   case getOrCreate key (Graph graph) of
     Node node ->
       Graph
@@ -223,7 +224,7 @@ insertEdgeDataHelper from to wrappedEdgeData graph =
     if from == to then
       -- self-edge, fill both incoming and outgoing
       graph
-        |> insert from
+        |> insertRawNode from
             (Node
               { fromNode
                 | incoming = Set.insert from fromNode.incoming
@@ -232,8 +233,8 @@ insertEdgeDataHelper from to wrappedEdgeData graph =
             )
     else
       graph
-        |> insert to (Node { toNode | incoming = Set.insert from toNode.incoming })
-        |> insert from (Node { fromNode | outgoing = Dict.insert to wrappedEdgeData fromNode.outgoing })
+        |> insertRawNode to (Node { toNode | incoming = Set.insert from toNode.incoming })
+        |> insertRawNode from (Node { fromNode | outgoing = Dict.insert to wrappedEdgeData fromNode.outgoing })
 
 
 getOrCreate key graph =
@@ -242,8 +243,8 @@ getOrCreate key graph =
 
 {-| Remove a node by its key. No-op if node doesn't exist.
 -}
-removeNode : comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
-removeNode key (Graph graph) =
+remove : comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
+remove key (Graph graph) =
   case get key (Graph graph) of
     Nothing ->
       (Graph graph)
@@ -282,8 +283,8 @@ removeEdge from to graph =
 
 {-| Remove the metadata associated with a specific node.
 -}
-removeNodeData : comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
-removeNodeData key (Graph graph) =
+removeData : comparable -> Graph comparable data edgeData -> Graph comparable data edgeData
+removeData key (Graph graph) =
   Graph
     { graph
       | nodes = graph.nodes |> Dict.update key (Maybe.map (\(Node node) -> Node { node | data = Nothing }))
@@ -299,11 +300,18 @@ removeEdgeData from to graph =
   graph |> removeEdge from to |> insertEdge from to
 
 
+{-| Create a graph with a single node with metadata.
+-}
+singleton : comparable -> data -> Graph comparable data edgeData
+singleton key data =
+  empty |> insertData key data
+
+
 {-| Update the metadata associated with a specific node.
 -}
 update : comparable -> (Maybe data -> Maybe data) -> Graph comparable data edgeData -> Graph comparable data edgeData
 update key fn graph =
-  getData key graph |> fn |> Maybe.map (\data -> insertNodeData key data graph) |> Maybe.withDefault graph
+  getData key graph |> fn |> Maybe.map (\data -> insertData key data graph) |> Maybe.withDefault graph
 
 
 {-| Update the metadata associated with a specific edge.
@@ -321,6 +329,13 @@ updateEdge from to fn graph =
 get : comparable -> Graph comparable data edgeData -> Maybe (Node comparable data edgeData)
 get key (Graph graph) =
   Dict.get key graph.nodes
+
+
+{-| Determine if the graph is empty.
+-}
+isEmpty : Graph comparable data edgeData -> Bool
+isEmpty (Graph graph) =
+  Dict.isEmpty graph.nodes
 
 
 {-| Determine the number of nodes in the graph.

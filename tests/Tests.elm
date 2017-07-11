@@ -38,7 +38,7 @@ graphTests =
         [ fuzz int "Insert a node with a random int id" <|
             \key ->
               empty
-                |> insertNode key
+                |> insert key
                 |> member key
                 |> Expect.true "inserted node isn't a member"
         , fuzz2 int int "Insert a node with a random comparable id" <|
@@ -48,7 +48,7 @@ graphTests =
                   ( key1, key2 )
               in
                 empty
-                  |> insertNode key
+                  |> insert key
                   |> member key
                   |> Expect.true "inserted node isn't a member"
         ]
@@ -56,8 +56,8 @@ graphTests =
         [ fuzz int "Remove a node with a random int id" <|
             \key ->
               empty
-                |> insertNode key
-                |> removeNode key
+                |> insert key
+                |> remove key
                 |> member key
                 |> Expect.false "removed key shouldn't be present"
         , fuzz2 int int "RemoveNode is a no-op if the key doesn't exist" <|
@@ -66,36 +66,36 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNode a
+                      |> insert a
                 in
                   graph
-                    |> removeNode b
+                    |> remove b
                     |> Expect.equal graph
         ]
     , describe "insertNodeData"
         [ fuzz2 int string "InsertNodeData creates the node if it doesn't exist" <|
             \key data ->
               empty
-                |> insertNodeData key data
+                |> insertData key data
                 |> member key
                 |> Expect.true "insertNodeData should've inserted a node"
         , fuzz2 int string "Node metadata gets stored in the graph" <|
             \key data ->
               empty
-                |> insertNodeData key data
+                |> insertData key data
                 |> getData key
                 |> Expect.equal (Just data)
         , fuzz2 int string "inserting an existing node doesn't remove metadata" <|
             \key data ->
               empty
-                |> insertNodeData key data
-                |> insertNode key
+                |> insertData key data
+                |> insert key
                 |> getData key
                 |> Expect.equal (Just data)
         , fuzz2 int string "Node metadata doesn't have to be comparable" <|
             \key data ->
               empty
-                |> insertNodeData key { data = data }
+                |> insertData key { data = data }
                 |> getData key
                 |> Expect.equal (Just { data = data })
         ]
@@ -105,7 +105,7 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertNodeData key { data = key }
+                    |> insertData key { data = key }
                     |> P.insertEdge ( key, key )
               in
                 many
@@ -122,8 +122,8 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNodeData from { data = from }
-                      |> insertNodeData to { data = to }
+                      |> insertData from { data = from }
+                      |> insertData to { data = to }
                       |> P.insertEdge ( from, to )
                 in
                   many
@@ -140,7 +140,7 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNodeData to { data = to }
+                      |> insertData to { data = to }
                       |> P.insertEdge ( from, to )
                 in
                   many
@@ -157,7 +157,7 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNodeData from { data = from }
+                      |> insertData from { data = from }
                       |> P.insertEdge ( from, to )
                 in
                   many
@@ -192,14 +192,14 @@ graphTests =
         [ fuzz int "Member check for members returns true" <|
             \key ->
               empty
-                |> insertNode key
+                |> insert key
                 |> member key
                 |> Expect.true "member should be present"
         , fuzz2 int int "Member check for non-existant members returns false" <|
             \memberKey nonMemberKey ->
               allDifferent [ memberKey, nonMemberKey ] <|
                 (empty
-                  |> insertNode memberKey
+                  |> insert memberKey
                   |> member nonMemberKey
                   |> Expect.false "non-member should not be present"
                 )
@@ -310,8 +310,8 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNodeData a { x = 1 }
-                      |> insertNodeData b { x = 2 }
+                      |> insertData a { x = 1 }
+                      |> insertData b { x = 2 }
                       |> P.insertEdge ( a, b )
 
                   removed =
@@ -330,7 +330,7 @@ graphTests =
             \a b ->
               empty
                 |> P.insertEdge ( a, b )
-                |> removeNode b
+                |> remove b
                 |> outgoing a
                 |> Set.member b
                 |> Expect.false "edge to removed node shouldn't be present"
@@ -338,7 +338,7 @@ graphTests =
             \a b ->
               empty
                 |> P.insertEdge ( a, b )
-                |> removeNode a
+                |> remove a
                 |> incoming b
                 |> Set.member a
                 |> Expect.false "edge from removed node shouldn't be present"
@@ -353,7 +353,7 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNode b
+                      |> insert b
                 in
                   graph |> P.removeEdge ( a, b ) |> Expect.equal graph
         , fuzz2 int int "Remove an edge with non-existant target node is a no-op" <|
@@ -362,28 +362,28 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNode a
+                      |> insert a
                 in
                   graph |> P.removeEdge ( a, b ) |> Expect.equal graph
         ]
     , describe "size"
         [ fuzz (list int) "Size equals the number of unique keys inserted " <|
             \keys ->
-              List.foldl insertNode empty keys
+              List.foldl insert empty keys
                 |> size
                 |> Expect.equal (Set.fromList keys |> Set.size)
         ]
     , describe "nodes"
         [ fuzz (list int) "nodes returns all inserted keys" <|
             \keys ->
-              List.foldl insertNode empty keys
+              List.foldl insert empty keys
                 |> nodes
                 |> List.map Tuple.first
                 |> Set.fromList
                 |> Expect.equal (Set.fromList keys)
         , fuzz (list int) "nodes returns all inserted keys, with metadata" <|
             \keys ->
-              List.foldl (\key -> insertNodeData key ( key, key )) empty keys
+              List.foldl (\key -> insertData key ( key, key )) empty keys
                 |> nodes
                 |> List.map (\( key, data ) -> ( key, Maybe.withDefault ( key, 42 ) <| data ))
                 |> Set.fromList
@@ -417,9 +417,9 @@ graphTests =
                       |> P.insertEdge ( c, d )
                       |> P.insertEdge ( d, e )
                       |> P.insertEdge ( e, a )
-                      |> insertNodeData a a
-                      |> insertNodeData b b
-                      |> insertNodeData e e
+                      |> insertData a a
+                      |> insertData b b
+                      |> insertData e e
 
                   nodesBefore =
                     nodes graph
@@ -445,7 +445,7 @@ graphTests =
             \keys ->
               let
                 graph =
-                  List.foldl (\key -> insertNodeData key key) empty keys
+                  List.foldl (\key -> insertData key key) empty keys
               in
                 graph
                   |> foldl (\key data acc -> (data |> Maybe.withDefault 0) + acc) 0
@@ -460,8 +460,8 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertNode 1
-                    |> insertNode 2
+                    |> insert 1
+                    |> insert 2
               in
                 graph
                   |> foldl (\key data acc -> key :: acc) []
@@ -471,7 +471,7 @@ graphTests =
             \keys ->
               let
                 graph =
-                  List.foldl insertNode empty keys
+                  List.foldl insert empty keys
               in
                 graph
                   |> foldl (\key data acc -> key :: acc) []
@@ -484,7 +484,7 @@ graphTests =
             \keys ->
               let
                 graph =
-                  List.foldl insertNode empty keys
+                  List.foldl insert empty keys
               in
                 graph
                   |> foldl (\key data acc -> key :: acc) []
@@ -520,23 +520,23 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> insertNodeData a { x = a }
-                      |> insertNodeData b { x = b }
-                      |> insertNodeData c { x = c }
+                      |> insertData a { x = a }
+                      |> insertData b { x = b }
+                      |> insertData c { x = c }
                       |> P.insertEdge ( a, b )
                       |> P.insertEdge ( a, c )
 
                   rightGraph =
                     empty
-                      |> insertNodeData d { x = d }
-                      |> insertNodeData e { x = e }
+                      |> insertData d { x = d }
+                      |> insertData e { x = e }
                       |> P.insertEdge ( d, e )
 
                   graph =
                     rightGraph
-                      |> insertNodeData a { x = a }
-                      |> insertNodeData b { x = b }
-                      |> insertNodeData c { x = c }
+                      |> insertData a { x = a }
+                      |> insertData b { x = b }
+                      |> insertData c { x = c }
                       |> P.insertEdge ( a, b )
                       |> P.insertEdge ( a, c )
                       |> P.insertEdge ( c, d )
@@ -563,11 +563,11 @@ graphTests =
                 let
                   graph =
                     empty
-                      |> insertNodeData a { x = a }
-                      |> insertNodeData b { x = b }
-                      |> insertNodeData c { x = c }
-                      |> insertNodeData d { x = d }
-                      |> insertNodeData e { x = e }
+                      |> insertData a { x = a }
+                      |> insertData b { x = b }
+                      |> insertData c { x = c }
+                      |> insertData d { x = d }
+                      |> insertData e { x = e }
                       |> P.insertEdge ( a, b )
                       |> P.insertEdge ( a, c )
                       |> P.insertEdge ( c, d )
@@ -591,22 +591,22 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> insertNodeData a { x = a }
-                      |> insertNodeData b { x = b }
-                      |> insertNodeData c { x = c }
+                      |> insertData a { x = a }
+                      |> insertData b { x = b }
+                      |> insertData c { x = c }
                       |> P.insertEdge ( a, b )
                       |> P.insertEdge ( a, c )
 
                   rightGraph =
                     empty
-                      |> insertNodeData d { x = d }
-                      |> insertNodeData e { x = e }
+                      |> insertData d { x = d }
+                      |> insertData e { x = e }
                       |> P.insertEdge ( d, e )
 
                   graph =
                     leftGraph
-                      |> insertNodeData d { x = d }
-                      |> insertNodeData e { x = e }
+                      |> insertData d { x = d }
+                      |> insertData e { x = e }
                       |> P.insertEdge ( d, e )
 
                   graphUnion =
@@ -619,16 +619,16 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> insertNodeData a { x = a }
+                      |> insertData a { x = a }
 
                   rightGraph =
                     empty
-                      |> insertNodeData b { x = b }
+                      |> insertData b { x = b }
 
                   graph =
                     leftGraph
-                      |> insertNodeData a { x = a }
-                      |> insertNodeData b { x = b }
+                      |> insertData a { x = a }
+                      |> insertData b { x = b }
                       |> P.insertEdge ( a, b )
 
                   graphUnionLeft =
@@ -679,10 +679,10 @@ graphTests =
             \a b ->
               let
                 left =
-                  empty |> insertNodeData a a
+                  empty |> insertData a a
 
                 right =
-                  empty |> insertNodeData a b
+                  empty |> insertData a b
               in
                 union left right |> getData a |> Expect.equal (Just a)
         ]
@@ -692,11 +692,11 @@ graphTests =
               allDifferent [ a, b ] <|
                 let
                   subgraph =
-                    empty |> insertNode a
+                    empty |> insert a
 
                   graph =
                     subgraph
-                      |> insertNode b
+                      |> insert b
                 in
                   intersect graph subgraph |> Expect.equal subgraph
         , fuzz2 int int "intersect keeps only equal metadata" <|
@@ -704,11 +704,11 @@ graphTests =
               allDifferent [ a, b ] <|
                 let
                   subgraph =
-                    empty |> insertNodeData a { x = a }
+                    empty |> insertData a { x = a }
 
                   graph =
                     subgraph
-                      |> insertNodeData b { x = b }
+                      |> insertData b { x = b }
                 in
                   intersect graph subgraph
                     |> nodes
@@ -717,10 +717,10 @@ graphTests =
             \a ->
               let
                 left =
-                  empty |> insertNodeData a { x = a }
+                  empty |> insertData a { x = a }
 
                 right =
-                  empty |> insertNode a
+                  empty |> insert a
               in
                 intersect left right
                   |> nodes
@@ -734,7 +734,7 @@ graphTests =
 
                   graph =
                     subgraph
-                      |> insertNode c
+                      |> insert c
                       |> P.insertEdge ( b, c )
                 in
                   intersect graph subgraph |> edges |> Expect.equal (edges subgraph)
@@ -744,16 +744,16 @@ graphTests =
                 let
                   leftGraph =
                     empty
-                      |> insertNodeData a { x = a }
-                      |> insertNodeData b { x = b }
-                      |> insertNodeData c { x = c }
+                      |> insertData a { x = a }
+                      |> insertData b { x = b }
+                      |> insertData c { x = c }
                       |> P.insertEdge ( a, b )
                       |> P.insertEdge ( a, c )
 
                   graph =
                     leftGraph
-                      |> insertNodeData d { x = d }
-                      |> insertNodeData e { x = e }
+                      |> insertData d { x = d }
+                      |> insertData e { x = e }
                       |> P.insertEdge ( d, e )
                 in
                   many
@@ -768,10 +768,10 @@ graphTests =
               let
                 graph =
                   empty
-                    |> insertNode 1
-                    |> insertNode 2
-                    |> insertNode 3
-                    |> insertNode 4
+                    |> insert 1
+                    |> insert 2
+                    |> insert 3
+                    |> insert 4
               in
                 postOrder graph |> Expect.equal [ 1, 2, 3, 4 ]
         , test "postOrder yields keys in post order for trees" <|
