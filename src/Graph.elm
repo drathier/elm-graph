@@ -32,6 +32,7 @@ module Graph
     , foldl
     , foldr
       -- set operations
+    , filter
     , partition
     , union
     , intersect
@@ -63,7 +64,7 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs map, mapEdge, foldl, foldr
 
 # Combine
-@docs partition, union, intersect
+@docs filter, partition, union, intersect
 
 # Algorithms and Traversal
 @docs postOrder, topologicalSort
@@ -487,7 +488,14 @@ foldr func acc (Graph graph) =
   Dict.foldr (\key (Node node) -> func key node.data) acc graph.nodes
 
 
-{-| Partition a graph into two parts, one with the nodes where the predicate function returned True, and one where it returned False.
+{-| Create a copy of the graph, only keeping nodes where the predicate function returned True.
+-}
+filter : (comparable -> Maybe data -> Bool) -> Graph comparable data edgeData -> Graph comparable data edgeData
+filter func graph =
+  partition func graph |> Tuple.first
+
+
+{-| Partition a graph into two parts. The left one, with the nodes where the predicate function returned True, and right one, where it returned False.
 -}
 partition : (comparable -> Maybe data -> Bool) -> Graph comparable data edgeData -> ( Graph comparable data edgeData, Graph comparable data edgeData )
 partition func (Graph graph) =
