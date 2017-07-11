@@ -9,7 +9,6 @@
     ],
     "exposed-modules": [
         "Graph",
-        "Graph.RelativeOrdering",
         "Graph.Random"
     ],
     "dependencies": {

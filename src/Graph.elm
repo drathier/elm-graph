@@ -11,8 +11,6 @@ module Graph
     , keys
     , nodes
     , edges
-    , reachable
-    , relativeOrder
       -- build
     , empty
     , insertNode
@@ -20,9 +18,6 @@ module Graph
     , insertEdge
     , removeNode
     , removeEdge
-      -- feature flags
-    , enableDagReachability
-    , disableDagReachability
       -- transformation
     , map
     , foldl
@@ -51,7 +46,7 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs empty, insertNode, insertNodeData, insertEdge, removeNode, removeEdge
 
 # Query
-@docs getData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, isAcyclic, reachable, relativeOrder
+@docs getData, member, memberEdge, incoming, outgoing, size, keys, nodes, edges, isAcyclic
 
 # Transform
 @docs map, foldl, foldr
@@ -62,8 +57,6 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 # Algorithms and Traversal
 @docs postOrder, topologicalSort
 
-# Feature flags
-@docs enableDagReachability, disableDagReachability
 
 -}
 
@@ -87,11 +80,6 @@ import Graph.Internal as I
     , keys
     , nodes
     , edges
-    , reachable
-    , relativeOrder
-      -- feature flags
-    , enableDagReachability
-    , disableDagReachability
       -- transformation
     , map
     , foldl
@@ -106,7 +94,6 @@ import Graph.Internal as I
     , isAcyclic
       -- debugging
     )
-import Graph.RelativeOrdering exposing (RelativeOrdering)
 import Set exposing (Set)
 
 
@@ -185,25 +172,6 @@ removeEdge ( from, to ) graph =
   I.removeEdge ( from, to ) graph
 
 
--- DYNAMIC FEATURES
-
-
-{-| Enable the dynamic reachability optimization for *directed acyclic graphs*. This allows `O(log n)` queries for the relative ordering of two elements in a partially ordered set, and `O(log n)` queries for the set of nodes that are reachable from a specific node.
-
-The downside is that modifying the graph now takes `O(log n * (nodes before this node))` time on average. Modifying the beginning of the graph is thus quite fast, but inserting an edge at the end takes `O(n log n)` time. The other downside is that this optimization only works on directed acyclic graphs.
--}
-enableDagReachability : I.Graph comparable data -> Maybe (I.Graph comparable data)
-enableDagReachability graph =
-  I.enableDagReachability graph
-
-
-{-| Disable the dynamic reachability optimization for *directed acyclic graphs*.
--}
-disableDagReachability : I.Graph comparable data -> I.Graph comparable data
-disableDagReachability graph =
-  I.disableDagReachability graph
-
-
 -- QUERY
 
 
@@ -254,20 +222,6 @@ edges graph =
 isAcyclic : I.Graph comparable data -> Bool
 isAcyclic graph =
   I.isAcyclic graph
-
-
-{-| Get the set of reachable nodes from a key, following outgoing edges any number of steps.
--}
-reachable : comparable -> I.Graph comparable data -> Set comparable
-reachable key graph =
-  I.reachable key graph
-
-
-{-| Returns the relative ordering of two keys in a *directed acyclic graph*. If there is a path from `a` to `b` over outgoing edges, `a` is `Before` `b`. If there is no path between them, they compare `Concurrent`.
--}
-relativeOrder : comparable -> comparable -> I.Graph comparable data -> RelativeOrdering
-relativeOrder a b graph =
-  I.relativeOrder a b graph
 
 
 -- TRANSFORM

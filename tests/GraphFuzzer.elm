@@ -4,18 +4,9 @@ import Dict exposing (Dict)
 import List.Extra
 import Random.Pcg exposing (..)
 import Fuzz exposing (Fuzzer)
-import Graph.Internal as G exposing (Graph, empty, valid)
+import Graph.Internal as G exposing (Graph, valid)
 import Set
 import Shrink exposing (Shrinker)
-
-
-emptyDag =
-  case G.empty |> G.enableDagReachability of
-    Just g ->
-      g
-
-    Nothing ->
-      Debug.crash "how did we fail at enabling DAG reachability on an empty graph?"
 
 
 -- Fuzzing
@@ -23,27 +14,27 @@ emptyDag =
 
 acyclicGraphFuzzer : Fuzzer (Graph Int data)
 acyclicGraphFuzzer =
-  Fuzz.custom (graphGenerator emptyDag (edgeGenerator (<))) (graphShrinker emptyDag (<))
+  Fuzz.custom (graphGenerator (edgeGenerator (<))) (graphShrinker (<))
 
 
 acyclicGraphFuzzerWithSelfEdges : Fuzzer (Graph Int data)
 acyclicGraphFuzzerWithSelfEdges =
-  Fuzz.custom (graphGenerator empty (edgeGenerator (<=))) (graphShrinker empty (<=))
+  Fuzz.custom (graphGenerator (edgeGenerator (<=))) (graphShrinker (<=))
 
 
 graphFuzzer : Fuzzer (Graph Int data)
 graphFuzzer =
-  Fuzz.custom (graphGenerator empty (edgeGenerator (\_ _ -> True))) (graphShrinker empty (\_ _ -> True))
+  Fuzz.custom (graphGenerator (edgeGenerator (\_ _ -> True))) (graphShrinker (\_ _ -> True))
 
 
 -- Shrinking
 
 
-graphShrinker : Graph Int data -> (Int -> Int -> Bool) -> Shrinker (Graph Int data)
-graphShrinker empty edgePredicate =
+graphShrinker : (Int -> Int -> Bool) -> Shrinker (Graph Int data)
+graphShrinker edgePredicate =
   let
     toGraph =
-      List.foldl G.insertEdge empty
+      List.foldl G.insertEdge G.empty
 
     fromGraph =
       G.edges
@@ -62,10 +53,9 @@ graphShrinker empty edgePredicate =
 
 
 graphGenerator :
-  Graph Int data
-  -> (List Int -> Generator (List ( Int, Int )))
+  (List Int -> Generator (List ( Int, Int )))
   -> Generator (Graph Int data)
-graphGenerator empty edgeGenerator =
+graphGenerator edgeGenerator =
   -- NOTE: the 0, 100 range is hard coded in multiple places in this file
   int 0 20
     |> andThen (\n -> list n (int 0 100))
@@ -74,7 +64,7 @@ graphGenerator empty edgeGenerator =
         (\keys ->
           map
             (\edges ->
-              List.foldl G.insertEdge empty edges
+              List.foldl G.insertEdge G.empty edges
             )
             (edgeGenerator keys)
         )

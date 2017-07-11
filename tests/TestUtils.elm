@@ -5,15 +5,6 @@ import Graph.Internal exposing (..)
 import Test exposing (..)
 
 
-emptyDag =
-  case empty |> enableDagReachability of
-    Just g ->
-      g
-
-    Nothing ->
-      Debug.crash "how did we fail at enabling DAG reachability on an empty graph?"
-
-
 many : List Expect.Expectation -> Expect.Expectation
 many expectations =
   case expectations of
