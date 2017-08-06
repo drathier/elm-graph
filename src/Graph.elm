@@ -41,6 +41,7 @@ module Graph
     , postOrder
     , isAcyclic
       -- debugging
+    , graphviz
     , valid
     )
 
@@ -70,7 +71,7 @@ Operations that look at all elements in the graph are at most `O(n log n)`.
 @docs postOrder, topologicalSort
 
 # Debugging tools
-@docs valid
+@docs graphviz, valid
 -}
 
 import Dict exposing (Dict)
@@ -638,6 +639,23 @@ reversePostOrderHelper nodeKeys keyOrder seenKeys graph =
               graph
         in
           reversePostOrderHelper keys (key :: order) seen graph
+
+
+{-| Returns the graph in Graphviz digraph format as a string.
+-}
+graphviz : Graph comparable data edgeData -> String
+graphviz graph =
+  let
+    quote a =
+      "\"" ++ toString a ++ "\""
+
+    e =
+      edges graph |> List.map (\( a, b ) -> quote a ++ "->" ++ quote b) |> String.join ";"
+
+    n =
+      nodes graph |> List.map (\( n, d ) -> quote n) |> String.join ";"
+  in
+    "digraph g { " ++ n ++ ";" ++ e ++ "}"
 
 
 {-| Validate checks that all invariants in the graph are correct. Useful for debugging.

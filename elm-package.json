@@ -1,5 +1,5 @@
 {
-    "version": "2.0.1",
+    "version": "3.1.0",
     "summary": "Simple graph library.",
     "repository": "https://github.com/drathier/elm-graph.git",
     "license": "BSD3",
